@@ -9,7 +9,7 @@ No internet is needed at the markets.
 
 ONE-TIME INSTALL (needs internet, about 2 minutes)
 1. Connect the iPad to Wi-Fi.
-2. Open Safari and go to the install link you were given.
+2. Open Safari and go to:  https://kaifrancis16.github.io/little-shop/
 3. Wait on that page. It says "Preparing the app for offline use", then the shop opens by itself.
 4. Tap the Share button (the square with an arrow, top right of Safari).
 5. Tap "Add to Home Screen". If it shows "Open as Web App", leave it switched on.
