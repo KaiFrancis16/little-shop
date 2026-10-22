@@ -1,0 +1,59 @@
+LITTLE SHOP - SETTING UP THE iPAD
+For: iPad Air (5th generation, 2022) using Safari
+Updated 22 October 2026
+
+HOW IT WORKS
+Little Shop is installed once from Safari while the iPad has internet (home Wi-Fi is fine).
+After that it lives on the Home Screen as its own app and runs completely offline.
+No internet is needed at the markets.
+
+ONE-TIME INSTALL (needs internet, about 2 minutes)
+1. Connect the iPad to Wi-Fi.
+2. Open Safari and go to the install link you were given.
+3. Wait on that page. It says "Preparing the app for offline use", then the shop opens by itself.
+4. Tap the Share button (the square with an arrow, top right of Safari).
+5. Tap "Add to Home Screen". If it shows "Open as Web App", leave it switched on.
+   Name it "Little Shop" and tap Add. A green shop icon appears on the Home Screen.
+6. Close Safari. From now on, always open Little Shop from the green Home Screen icon, not from Safari.
+7. Open the green icon once while still on Wi-Fi and let it load.
+
+CHECK IT WORKS OFFLINE (do this before the first market)
+1. Swipe down from the top-right corner and turn on Airplane Mode. Make sure Wi-Fi is off too.
+2. Swipe up to close the Little Shop app completely, then open it again from the green icon.
+3. It should open normally. Try adding an item to the basket and opening Process sale.
+4. Turn Airplane Mode off again when you are done.
+
+SETTING UP ITEMS AND MARKETS
+Do this inside the Home Screen app (not in Safari). Safari and the Home Screen app keep separate records,
+so anything entered in Safari will not appear in the app.
+- Editing > Markets: add the markets you sell at.
+- Editing > Headings: add headings (e.g. Jams) and subheadings (e.g. Sugar-free).
+- Editing > Items: add each item with its name, price, heading and a photo.
+
+AT THE MARKET
+1. Open Little Shop from the Home Screen.
+2. Tap your market. If you pick the wrong one, tap the market name in the top-right corner to change it.
+3. Tap items to add them to the basket. Use - and + to change quantities.
+4. Tap Process sale to see the total. Optionally type the cash received (or tap a quick amount) to see the change.
+5. Tap Complete sale. The basket clears for the next customer.
+
+KEEP YOUR SETUP SAFE
+Your items, headings and markets are saved only on this iPad. They are not backed up anywhere.
+- Do NOT delete the Little Shop icon from the Home Screen. Deleting it erases everything entered in it.
+- Do NOT use Settings > Safari > Clear History and Website Data. It can also erase the app's records.
+If either happens, reinstall using the steps above and enter the items and markets again.
+
+UPDATES
+When a new version of Little Shop is published to the install link, connect the iPad to Wi-Fi,
+open Little Shop from the Home Screen, wait a few seconds, close it fully and open it again.
+The new version appears and your items and markets stay as they are.
+Do not delete the app to update it.
+
+FILES IN THIS FOLDER (for whoever hosts the install link)
+- index.html / install-offline.html: the install page that prepares the app
+- offline/index.html: the complete app
+- offline/sw.js: makes the app work offline
+- offline/manifest.webmanifest, offline/icon-192.png, offline/icon-512.png: Home Screen name and icon
+- favicon.svg: small browser icon
+The whole folder must be uploaded, as it is, to a website with an https:// address.
+Opening these files directly from the Files app does NOT work, because iPadOS will not run them there.

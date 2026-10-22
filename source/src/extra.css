@@ -1,0 +1,173 @@
+/* Product card: basket count (stock no longer shown) */
+.stock.in-basket {
+  color: #126448;
+  font-weight: 600;
+}
+
+/* Editing tab */
+.editing-sections {
+  margin: 18px 0 24px;
+}
+.editing-sections button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+  justify-content: center;
+}
+.editing-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.editing-section-heading h2 {
+  margin: 0;
+  font-size: 23px;
+}
+.editing-help {
+  margin: 0 0 18px;
+  max-width: 70ch;
+}
+.item-hidden td {
+  color: #7d8a82;
+}
+.item-hidden .thumb {
+  opacity: 0.5;
+}
+.hidden-tag {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: #a9601d;
+  font-weight: 600;
+}
+.market-list {
+  max-width: 720px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.market-list .category-child {
+  margin-left: 0;
+  padding-left: 0;
+  border-left: 0;
+}
+.market-list .category-child:first-child {
+  border-top: 0;
+}
+.market-row-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #126448;
+}
+.market-row-name strong {
+  color: #1d2b23;
+}
+
+/* Market picker on the checkout */
+.market-options {
+  display: grid;
+  gap: 10px;
+  margin: 6px 0 4px;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+.market-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 18px;
+  border: 1px solid #d8e2dc;
+  border-radius: 14px;
+  background: #fff;
+  color: #1d2b23;
+  font-size: 17px;
+  font-weight: 600;
+  text-align: left;
+}
+.market-option svg {
+  color: #126448;
+  flex-shrink: 0;
+}
+.market-option span {
+  flex: 1;
+}
+.market-option[aria-pressed=true] {
+  border-color: #126448;
+  background: #e5f0e9;
+}
+.market-option:active {
+  background: #eef5f1;
+}
+
+/* iPad Air (5th gen): 1180x820 landscape, 820x1180 portrait.
+   Checkout items in rows of 4 on both orientations. */
+@media (min-width: 820px) {
+  .offline-app .product-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+/* Landscape iPad Air */
+@media (min-width: 1051px) and (max-width: 1279px) {
+  .offline-app {
+    --basket-width: 320px;
+  }
+  .offline-app .product-info {
+    padding: 12px;
+  }
+  .offline-app .product-info h3 {
+    font-size: 16px;
+  }
+}
+/* Portrait iPad Air: narrower basket and compact cards so 4 fit */
+@media (min-width: 820px) and (max-width: 1050px) {
+  .offline-app {
+    --shop-gutter: 16px;
+    --basket-width: 270px;
+  }
+  .offline-app .workspace {
+    gap: 16px;
+  }
+  .offline-app .product-grid {
+    gap: 10px;
+  }
+  .offline-app .product-info {
+    padding: 10px;
+  }
+  .offline-app .product-info h3 {
+    font-size: 14px;
+    line-height: 1.3;
+  }
+  .offline-app .product-info .price {
+    font-size: 15px;
+  }
+  .offline-app .product .add-mark {
+    right: 6px;
+    top: 6px;
+    transform: scale(0.85);
+  }
+  .offline-app .stock {
+    margin-top: 6px;
+    font-size: 11px;
+  }
+}
+
+/* Keep each card's picture at the top when cards in a row differ in height */
+.offline-app .product {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+.offline-app .product .product-image {
+  width: 100%;
+  flex-shrink: 0;
+}
+.offline-app .product .product-info {
+  flex: 1;
+  width: 100%;
+}
