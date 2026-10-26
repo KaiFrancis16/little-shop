@@ -1,21 +1,43 @@
-var nJ = () => ({ revision: 0, products: [], categories: [], sales: [], movements: [], markets: [] }),
+var nJ = () => ({ revision: 0, products: [], categories: [], sales: [], movements: [], markets: [], stocktakes: [] }),
   KO;
 function iJ() {
   return (KO ??= new Promise((e, t) => {
     let a = indexedDB.open("little-shop-offline", 1);
     ((a.onupgradeneeded = () => a.result.createObjectStore("shop")),
-      (a.onsuccess = () => e(a.result)),
+      (a.onsuccess = () => {
+        let db = a.result,
+          p = KO;
+        // iPad Safari can close the storage connection (e.g. after the app was in the background
+        // or the iPad was locked). Forget the closed connection so the next save opens a fresh one.
+        let forget = () => KO === p && (KO = void 0);
+        ((db.onclose = forget),
+          (db.onversionchange = () => {
+            (db.close(), forget());
+          }),
+          e(db));
+      }),
       (a.onerror = () => {
         ((KO = void 0),
           t(Error("Device storage is unavailable. Open the installed app outside private browsing.")));
+      }),
+      (a.onblocked = () => {
+        ((KO = void 0), t(Error("Storage is busy. Close other Little Shop windows and try again.")));
       }));
   }));
 }
-async function G5(e) {
-  let t = await iJ();
+// Read (and optionally change) the saved shop. If the connection has been closed by the browser,
+// reconnect and try once more. A failed transaction saves nothing, so retrying is safe.
+async function G5(e, again = !0) {
+  let t, n;
+  try {
+    ((t = await iJ()), (n = t.transaction("shop", e ? "readwrite" : "readonly")));
+  } catch (err) {
+    KO = void 0;
+    if (again) return G5(e, !1);
+    throw Error("Could not reach this device's storage. Close the app fully and open it again.");
+  }
   return new Promise((a, r) => {
-    let n = t.transaction("shop", e ? "readwrite" : "readonly"),
-      i = n.objectStore("shop"),
+    let i = n.objectStore("shop"),
       o = i.get("state"),
       A,
       s;
@@ -29,7 +51,13 @@ async function G5(e) {
     }),
       (n.oncomplete = () => a(A)),
       (n.onabort = n.onerror =
-        () => r(s || Error("Could not save on this device. Free some storage and try again."))));
+        (ev) => {
+          ev && ev.preventDefault && ev.preventDefault();
+          // Our own validation error: report it. Otherwise the connection failed mid-way: reconnect and retry once.
+          if (s) return r(s);
+          if (again) return ((KO = void 0), G5(e, !1).then(a, r));
+          r(Error("Could not save on this device. Free some storage and try again."));
+        }));
   });
 }
 var GO = () => G5();
@@ -146,28 +174,31 @@ function oJ(e, t) {
       for (let s of A) s.category_id = i.parent_id || null;
     }
   } else if (t.action === "sale") {
+    // Sale: cash (automatic 5% off, rounded to 5c) or card (optional staff 20% / stallholder 10%)
+    let mk = typeof t.market == "string" ? t.market.trim() : "",
+      dtype = t.method === "card" && (t.discount === "staff20" || t.discount === "stall10") ? t.discount : null,
+      nm = typeof t.staffName == "string" ? t.staffName.trim() : "";
     if (
-      !["cash", "card", "none"].includes(t.method) ||
-      typeof t.market != "string" ||
-      !t.market.trim() ||
-      t.market.trim().length > 100 ||
+      !["cash", "card"].includes(t.method) ||
+      !mk ||
+      mk.length > 100 ||
       typeof t.id != "string" ||
       !Array.isArray(t.lines) ||
       !t.lines.length ||
       t.lines.length > 200 ||
-      !Number.isSafeInteger(t.cash) ||
-      t.cash < 0 ||
-      t.cash > 1e8 ||
-      (t.method === "cash" && t.cash % 5 !== 0) ||
-      (t.method !== "cash" && t.cash !== 0)
+      (t.discount != null && t.method === "card" && !dtype) ||
+      (dtype && (!nm || nm.length > 60))
     )
-      throw Error("Check the market and payment details.");
-    let n = new Set(),
+      throw Error("Check the payment details and staff name.");
+    let day = lsDay(a),
+      left = lsRemaining(e, day, mk),
+      n = new Set(),
       i = t.lines.map((s) => {
         let l = e.products.find((u) => u.id === s.id);
-        // Stock is treated as unlimited: no stock check here
         if (!l || l.archived || n.has(s.id) || !Number.isSafeInteger(s.qty) || s.qty < 1 || s.qty > 9999)
           throw Error("Some items are unavailable. Refresh the basket.");
+        if (s.qty > (left[l.id] || 0))
+          throw Error(`Not enough ${l.name} left in today's stocktake (${Math.max(0, left[l.id] || 0)} left).`);
         return (
           n.add(s.id),
           {
@@ -184,21 +215,53 @@ function oJ(e, t) {
       }),
       o = i.reduce((s, l) => s + l.total, 0);
     if (!Number.isSafeInteger(o) || o > 1e8) throw Error("The basket total is too large.");
-    let A = t.method === "cash" ? Math.round(o / 5) * 5 : o;
-    if (t.method === "cash" && t.cash < A) throw Error("Cash must cover the total.");
+    let pr = lsPrice(o, t.method, dtype);
     r = {
       id: t.id,
       at: a,
-      market: t.market.trim(),
+      date: day,
+      market: mk,
       method: t.method,
       subtotal: o,
-      total: A,
-      cash: t.cash,
-      change: t.method === "cash" ? t.cash - A : 0,
+      discount_type: pr.type,
+      discount_pct: pr.pct,
+      discount_amount: pr.discount,
+      staff_name: dtype ? nm : "",
+      rounding: pr.rounding,
+      total: pr.total,
+      cash: 0,
+      change: 0,
       lines: i,
     };
-    // Stock is treated as unlimited: sales no longer reduce stock
     e.sales.unshift(r);
+  } else if (t.action === "stocktake") {
+    // Morning stocktake for one day + market
+    let mk = typeof t.market == "string" ? t.market.trim() : "";
+    if (!mk || mk.length > 100 || typeof t.date != "string" || !/^\d{4}-\d{2}-\d{2}$/.test(t.date) || !t.counts || typeof t.counts != "object")
+      throw Error("Check the stocktake details.");
+    let counts = {};
+    for (let [pid, v] of Object.entries(t.counts)) {
+      if (!e.products.some((p) => p.id === pid)) continue;
+      if (!Number.isSafeInteger(v) || v < 0 || v > 1e6) throw Error("Stock counts must be whole numbers.");
+      counts[pid] = v;
+    }
+    e.stocktakes = (e.stocktakes || []).filter((x) => !(x.date === t.date && x.market === mk));
+    e.stocktakes.push({ id: t.date + "|" + mk, date: t.date, market: mk, counts, at: a });
+  } else if (t.action === "delete-sales") {
+    // Delete one day's sales for a market, or all sales. Today's stocktakes are kept.
+    let today = lsDay(a),
+      hit = (d, m) => t.all || (d === t.date && m === t.market);
+    e.sales = e.sales.filter((s) => !hit(lsSaleDay(s), s.market));
+    e.stocktakes = (e.stocktakes || []).filter((x) => x.date === today || !hit(x.date, x.market));
+  } else if (t.action === "sales-password") {
+    if (e.salesPw && t.oldHash !== e.salesPw.hash) throw Error("The current password is not correct.");
+    if (typeof t.hash != "string" || !/^[0-9a-f]{64}$/.test(t.hash) || typeof t.salt != "string" || !t.salt)
+      throw Error("Could not set the password.");
+    e.salesPw = { hash: t.hash, salt: t.salt };
+  } else if (t.action === "reset-sales") {
+    // Forgotten password: remove the password and every sales record
+    let today = lsDay(a);
+    ((e.sales = []), (e.stocktakes = (e.stocktakes || []).filter((x) => x.date === today)), delete e.salesPw);
   } else throw Error("Unknown action.");
   return (e.revision++, { ...e, receipt: r });
 }
@@ -8661,6 +8724,302 @@ function Wg(e, t) {
     i.click(),
     setTimeout(() => URL.revokeObjectURL(n), 1e3));
 }
+// ===================== Little Shop: days, stock, discounts, reports =====================
+var LS_TZ = "Australia/Brisbane";
+// Business day (Brisbane) as YYYY-MM-DD
+var lsDay = (d) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: LS_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(
+    d ? new Date(d) : new Date(),
+  );
+var lsDayLabel = (day) =>
+  new Intl.DateTimeFormat("en-AU", {
+    timeZone: "UTC",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(day + "T00:00:00Z"));
+var lsTime = (iso) =>
+  new Intl.DateTimeFormat("en-AU", { timeZone: LS_TZ, hour: "numeric", minute: "2-digit", hour12: !0 }).format(
+    new Date(iso),
+  );
+var lsHour = (iso) =>
+  Number(new Intl.DateTimeFormat("en-AU", { timeZone: LS_TZ, hour: "numeric", hour12: !1 }).format(new Date(iso))) % 24;
+var lsMoney = (c) => "$" + (c / 100).toFixed(2);
+var lsRound5 = (c) => Math.round(c / 5) * 5;
+var LS_DISCOUNTS = {
+  cash5: { pct: 5, label: "Cash sale 5%" },
+  staff20: { pct: 20, label: "Staff 20%" },
+  stall10: { pct: 10, label: "Stallholder 10%" },
+};
+var lsMethod = (m) => (m === "cash" ? "Cash" : m === "card" ? "Card" : "Not recorded");
+var lsDiscountLabel = (s) => (s.discount_type && LS_DISCOUNTS[s.discount_type] ? LS_DISCOUNTS[s.discount_type].label : "None");
+// Price a basket. Cash: 5% off, then round to nearest 5c. Card: optional staff 20% / stallholder 10%.
+function lsPrice(subtotal, method, dtype) {
+  let type = method === "cash" ? "cash5" : method === "card" && (dtype === "staff20" || dtype === "stall10") ? dtype : null,
+    pct = type ? LS_DISCOUNTS[type].pct : 0,
+    discount = Math.round((subtotal * pct) / 100),
+    after = subtotal - discount,
+    total = method === "cash" ? lsRound5(after) : after;
+  return { type, pct, discount, rounding: total - after, total };
+}
+var lsSaleDay = (s) => s.date || lsDay(s.at);
+var lsStocktake = (state, day, market) =>
+  (state.stocktakes || []).find((x) => x.date === day && x.market === market) || null;
+function lsSold(state, day, market) {
+  let sold = {};
+  for (let s of state.sales)
+    if (lsSaleDay(s) === day && s.market === market) for (let l of s.lines) sold[l.id] = (sold[l.id] || 0) + l.qty;
+  return sold;
+}
+// Stock left today at this market. Items not counted in the stocktake count as 0.
+function lsRemaining(state, day, market) {
+  let st = lsStocktake(state, day, market),
+    sold = lsSold(state, day, market),
+    out = {};
+  for (let p of state.products) out[p.id] = ((st && st.counts[p.id]) || 0) - (sold[p.id] || 0);
+  return out;
+}
+// All day+market groups that have sales, newest first
+function lsSaleGroups(state) {
+  let m = new Map();
+  for (let s of state.sales) {
+    let day = lsSaleDay(s),
+      k = day + "|" + s.market;
+    m.has(k) || m.set(k, { key: k, day, market: s.market, sales: [] });
+    m.get(k).sales.push(s);
+  }
+  return [...m.values()].sort((a, b) => (a.day === b.day ? a.market.localeCompare(b.market) : b.day.localeCompare(a.day)));
+}
+// Password hashing for the Sales tab (stored on the device only)
+async function lsHash(salt, pw) {
+  let buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(salt + ":" + pw));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+var lsSalt = () => [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+// ---------- PDF sheets ----------
+var lsCategory = (state, line) => {
+  if (typeof line.heading == "string") return { heading: line.heading || "Uncategorised", sub: line.subcategory || "" };
+  let o = Ow(state.products.find((p) => p.id === line.id)?.category_id ?? null, state.categories);
+  return { heading: o.heading, sub: o.subcategory };
+};
+var lsFileName = (day, market, purpose) =>
+  ("Little-Shop_" + day + "_" + market + "_" + purpose).replace(/[^A-Za-z0-9_-]+/g, "-").replace(/-+/g, "-") + ".pdf";
+var LS_TBL = {
+  styles: { fontSize: 9, cellPadding: 2.5, overflow: "linebreak" },
+  headStyles: { fillColor: [18, 100, 72] },
+  margin: { top: 16, right: 14, bottom: 18, left: 14 },
+  rowPageBreak: "avoid",
+};
+function lsDoc(purpose, day, market, landscape) {
+  Kj(); // initialise the bundled jsPDF + table plugin
+  let d = new Pt({ orientation: landscape ? "landscape" : "portrait", unit: "mm", format: "a4" });
+  d.setTextColor(18, 100, 72);
+  d.setFont("helvetica", "bold");
+  d.setFontSize(18);
+  d.text(purpose, 14, 18);
+  d.setTextColor(40, 55, 46);
+  d.setFontSize(12);
+  d.text(lsDayLabel(day) + "  |  " + market, 14, 26);
+  d.setFont("helvetica", "normal");
+  d.setFontSize(8.5);
+  d.setTextColor(95, 110, 101);
+  d.text("Little Shop  |  Times are Brisbane time  |  Created " + lsDayLabel(lsDay()) + " " + lsTime(new Date()), 14, 32);
+  d.lsTitle = purpose + " - " + lsDayLabel(day) + " - " + market;
+  d.lsY = 38;
+  return d;
+}
+function lsHeading(d, text) {
+  let y = (d.lastAutoTable && d.lastAutoTable.finalY ? d.lastAutoTable.finalY + 10 : d.lsY + 2);
+  y > d.internal.pageSize.getHeight() - 40 && (d.addPage(), (y = 20));
+  d.setFont("helvetica", "bold");
+  d.setFontSize(12);
+  d.setTextColor(40, 55, 46);
+  d.text(text, 14, y);
+  return y + 3;
+}
+function lsTable(d, title, head, body, opts) {
+  let y = lsHeading(d, title);
+  v1(d, { ...LS_TBL, ...(opts || {}), startY: y, head: [head], body: body.length ? body : [[{ content: "None", colSpan: head.length }]] });
+}
+function lsFinish(d) {
+  let n = d.getNumberOfPages(),
+    w = d.internal.pageSize.getWidth(),
+    h = d.internal.pageSize.getHeight();
+  for (let i = 1; i <= n; i++) {
+    d.setPage(i);
+    d.setFont("helvetica", "normal");
+    d.setFontSize(8);
+    d.setTextColor(95, 110, 101);
+    d.text(d.lsTitle, 14, h - 8);
+    d.text("Page " + i + " of " + n, w - 14, h - 8, { align: "right" });
+  }
+  return d;
+}
+function lsOverallPdf(state, day, market) {
+  let sales = state.sales.filter((s) => lsSaleDay(s) === day && s.market === market).sort((a, b) => a.at.localeCompare(b.at)),
+    sum = (f, list) => (list || sales).reduce((t, s) => t + f(s), 0),
+    items = sum((s) => s.lines.reduce((t, l) => t + l.qty, 0)),
+    gross = sum((s) => s.subtotal),
+    disc = sum((s) => s.discount_amount || 0),
+    rounding = sum((s) => s.rounding ?? (s.method === "cash" && !s.discount_type ? s.total - s.subtotal : 0)),
+    taken = sum((s) => s.total),
+    d = lsDoc("Overall sales of the day", day, market);
+  lsTable(
+    d,
+    "Summary",
+    ["", ""],
+    [
+      ["Number of sales", String(sales.length)],
+      ["Items sold", String(items)],
+      ["Sales before discounts", lsMoney(gross)],
+      ["Discounts given", "-" + lsMoney(disc)],
+      ["Cash rounding", (rounding < 0 ? "-" : "") + lsMoney(Math.abs(rounding))],
+      ["Total takings", lsMoney(taken)],
+      ["Average sale", sales.length ? lsMoney(Math.round(taken / sales.length)) : "-"],
+    ],
+    { showHead: "never", columnStyles: { 0: { fontStyle: "bold", cellWidth: 70 } } },
+  );
+  let methods = ["cash", "card", "none"].filter((m) => sales.some((s) => (s.method || "none") === m));
+  lsTable(
+    d,
+    "Takings by payment",
+    ["Payment", "Sales", "Takings"],
+    methods.map((m) => {
+      let l = sales.filter((s) => (s.method || "none") === m);
+      return [lsMethod(m), String(l.length), lsMoney(sum((s) => s.total, l))];
+    }),
+  );
+  lsTable(
+    d,
+    "Discounts",
+    ["Discount", "Sales", "Amount given"],
+    Object.keys(LS_DISCOUNTS)
+      .map((k) => {
+        let l = sales.filter((s) => s.discount_type === k);
+        return l.length ? [LS_DISCOUNTS[k].label, String(l.length), lsMoney(sum((s) => s.discount_amount || 0, l))] : null;
+      })
+      .filter(Boolean),
+  );
+  let byItem = new Map();
+  for (let s of sales)
+    for (let l of s.lines) {
+      let c = lsCategory(state, l),
+        k = c.heading + "|" + c.sub + "|" + l.name;
+      byItem.has(k) || byItem.set(k, { ...c, name: l.name, qty: 0, value: 0 });
+      let r = byItem.get(k);
+      ((r.qty += l.qty), (r.value += l.total));
+    }
+  lsTable(
+    d,
+    "Items sold (value before discounts)",
+    ["Heading", "Subheading", "Item", "Qty", "Value"],
+    [...byItem.values()]
+      .sort((a, b) => a.heading.localeCompare(b.heading) || a.sub.localeCompare(b.sub) || a.name.localeCompare(b.name))
+      .map((r) => [r.heading, r.sub, r.name, String(r.qty), lsMoney(r.value)]),
+  );
+  let hours = new Map();
+  for (let s of sales) {
+    let h = lsHour(s.at);
+    hours.has(h) || hours.set(h, { n: 0, t: 0 });
+    let r = hours.get(h);
+    ((r.n += 1), (r.t += s.total));
+  }
+  let hl = (h) => ((h % 12) || 12) + (h < 12 ? "am" : "pm");
+  lsTable(
+    d,
+    "Sales by hour",
+    ["Time", "Sales", "Takings"],
+    [...hours.entries()].sort((a, b) => a[0] - b[0]).map(([h, r]) => [hl(h) + " - " + hl((h + 1) % 24), String(r.n), lsMoney(r.t)]),
+  );
+  return lsFinish(d);
+}
+function lsDiscountPdf(state, day, market) {
+  let sales = state.sales
+      .filter((s) => lsSaleDay(s) === day && s.market === market && s.discount_type)
+      .sort((a, b) => a.at.localeCompare(b.at)),
+    d = lsDoc("Discounted sales", day, market, !0);
+  lsTable(
+    d,
+    "Summary",
+    ["Discount", "Sales", "Before discount", "Discount given", "Paid"],
+    Object.keys(LS_DISCOUNTS)
+      .map((k) => {
+        let l = sales.filter((s) => s.discount_type === k);
+        if (!l.length) return null;
+        let t = (f) => lsMoney(l.reduce((a, s) => a + f(s), 0));
+        return [LS_DISCOUNTS[k].label, String(l.length), t((s) => s.subtotal), t((s) => s.discount_amount || 0), t((s) => s.total)];
+      })
+      .filter(Boolean),
+  );
+  lsTable(
+    d,
+    "All discounted sales",
+    ["Time", "Discount", "Payment", "Name logged", "Items", "Before discount", "Discount", "Paid"],
+    sales.map((s) => [
+      lsTime(s.at),
+      lsDiscountLabel(s),
+      lsMethod(s.method),
+      s.staff_name || "-",
+      s.lines.map((l) => l.qty + " x " + l.name).join(", "),
+      lsMoney(s.subtotal),
+      "-" + lsMoney(s.discount_amount || 0),
+      lsMoney(s.total),
+    ]),
+    { columnStyles: { 4: { cellWidth: 80 } } },
+  );
+  return lsFinish(d);
+}
+function lsSelloutPdf(state, day, market) {
+  let st = lsStocktake(state, day, market),
+    counts = (st && st.counts) || {},
+    sales = state.sales.filter((s) => lsSaleDay(s) === day && s.market === market).sort((a, b) => a.at.localeCompare(b.at)),
+    running = {},
+    soldOut = {};
+  for (let s of sales)
+    for (let l of s.lines) {
+      running[l.id] = (running[l.id] || 0) + l.qty;
+      counts[l.id] > 0 && !soldOut[l.id] && running[l.id] >= counts[l.id] && (soldOut[l.id] = s.at);
+    }
+  let name = (id) => state.products.find((p) => p.id === id)?.name || sales.flatMap((s) => s.lines).find((l) => l.id === id)?.name || "Removed item",
+    cat = (id) => {
+      let p = state.products.find((x) => x.id === id),
+        o = Ow(p?.category_id ?? null, state.categories);
+      return o.heading + (o.subcategory ? " / " + o.subcategory : "");
+    },
+    d = lsDoc("Sell-out report", day, market);
+  st ||
+    (d.setFontSize(10), d.setTextColor(161, 47, 53), d.text("No morning stocktake was recorded for this day and market.", 14, d.lsY), (d.lsY += 6));
+  lsTable(
+    d,
+    "Items that sold out",
+    ["Sell-out time", "Item", "Heading", "Starting stock"],
+    Object.entries(soldOut)
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([id, at]) => [lsTime(at), name(id), cat(id), String(counts[id])]),
+  );
+  lsTable(
+    d,
+    "Stock summary (items counted that morning)",
+    ["Item", "Heading", "Start", "Sold", "Left"],
+    Object.entries(counts)
+      .filter(([, n]) => n > 0)
+      .map(([id, n]) => [name(id), cat(id), String(n), String(running[id] || 0), String(Math.max(0, n - (running[id] || 0)))])
+      .sort((a, b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0])),
+  );
+  return lsFinish(d);
+}
+// Hand the PDF to the iPad share sheet (Save to Files, AirDrop, Mail...), or download it elsewhere.
+function lsDeliver(doc, filename) {
+  let blob = doc.output("blob"),
+    file = typeof File == "function" ? new File([blob], filename, { type: "application/pdf" }) : null;
+  if (file && navigator.canShare && navigator.canShare({ files: [file] }))
+    return navigator.share({ files: [file], title: doc.lsTitle }).catch(() => {});
+  doc.save(filename);
+}
+// =======================================================================================
+
 function m_({ offline: e = !1 } = {}) {
   let [t, a] = (0, wa.useState)(R1e),
     [r, n] = (0, wa.useState)(!1),
@@ -8697,24 +9056,52 @@ function m_({ offline: e = !1 } = {}) {
     // Market being added/renamed in Editing, and its error message
     [mk, setMk] = (0, wa.useState)(null),
     [mkErr, setMkErr] = (0, wa.useState)(""),
+    // Business day (Brisbane). A new day asks for the market again.
+    [today, setToday] = (0, wa.useState)(lsDay()),
+    // Process sale: card discount option and the staff name logged with it
+    [dsc, setDsc] = (0, wa.useState)("none"),
+    [dName, setDName] = (0, wa.useState)(""),
+    // Inventory (morning stocktake)
+    [invQ, setInvQ] = (0, wa.useState)(""),
+    [stDraft, setStDraft] = (0, wa.useState)({}),
+    [stKey, setStKey] = (0, wa.useState)(""),
+    [stMsg, setStMsg] = (0, wa.useState)(""),
+    // Sales tab (password protected)
+    [salesOk, setSalesOk] = (0, wa.useState)(!1),
+    [pwErr, setPwErr] = (0, wa.useState)(""),
+    [selGrp, setSelGrp] = (0, wa.useState)(""),
+    [pwDlg, setPwDlg] = (0, wa.useState)(!1),
     Gt = (0, wa.useRef)(""),
     ut = (0, wa.useRef)(!1);
+  // The chosen market only lasts for the day it was chosen on
+  let MK = e ? "little-shop-offline-market" : "little-shop-market",
+    MKD = MK + "-day";
   (0, wa.useEffect)(() => {
-    let G = "";
+    let G = "",
+      d = "";
     try {
-      G = localStorage.getItem(e ? "little-shop-offline-market" : "little-shop-market") || "";
+      ((G = localStorage.getItem(MK) || ""), (d = localStorage.getItem(MKD) || ""));
     } catch {}
-    G.trim() ? we(G) : Ue(!0);
+    G.trim() && d === lsDay() ? we(G) : (we(""), Ue(!0));
+    // When the app is brought back on a new day (e.g. Sunday after Saturday), ask for the market again
+    let check = () => {
+      let now = lsDay();
+      setToday((old) => {
+        if (old !== now) (we(""), Ue(!0), B({}), S(!1), u((tab) => (tab === "inventory" ? tab : "checkout")));
+        return now;
+      });
+    };
+    let iv = setInterval(check, 6e4);
+    (document.addEventListener("visibilitychange", check), window.addEventListener("focus", check));
+    return () => (clearInterval(iv), document.removeEventListener("visibilitychange", check), window.removeEventListener("focus", check));
   }, []);
-  // Choose the current market (from the preset list)
+  // Choose the current market (from the preset list) for today
   function pickMarket(name) {
     we(name);
     try {
-      name
-        ? localStorage.setItem(e ? "little-shop-offline-market" : "little-shop-market", name)
-        : localStorage.removeItem(e ? "little-shop-offline-market" : "little-shop-market");
+      name ? (localStorage.setItem(MK, name), localStorage.setItem(MKD, lsDay())) : (localStorage.removeItem(MK), localStorage.removeItem(MKD));
     } catch {}
-    name && Ue(!1);
+    (name && Ue(!1), setToday(lsDay()));
   }
   let mkts = t.markets || [];
   // Save a market added or renamed in the Editing tab
@@ -8778,11 +9165,101 @@ function m_({ offline: e = !1 } = {}) {
       return st ? [{ ...st, qty: Te, total: st.price * Te }] : [];
     }),
     Jt = dt.reduce((G, Te) => G + Te.total, 0),
-    ft = vt === "card" ? Jt : Math.round(Jt / 5) * 5,
+    // Stock left today at the chosen market (items not counted = 0)
+    stToday = ve ? lsStocktake(t, today, ve) : null,
+    rem = ve ? lsRemaining(t, today, ve) : {},
+    left = (id) => Math.max(0, rem[id] || 0),
+    pr = lsPrice(Jt, vt, dsc),
+    ft = pr.total,
     kt = dt.reduce((G, Te) => G + Te.qty, 0),
-    da = dt.some((G) => G.archived),
+    da = dt.some((G) => G.archived || G.qty > left(G.id)),
     yt = (0, wa.useRef)({ active: at, lines: dt, cart: c, payment: w });
   yt.current = { active: at, lines: dt, cart: c, payment: w };
+  // ----- Inventory: morning stocktake for today + chosen market -----
+  let stSavedKey = today + "|" + ve,
+    stSaved = (stToday && stToday.counts) || {},
+    stCounts = (d) => {
+      let o = {};
+      for (let [k, v] of Object.entries(d)) String(v).trim() !== "" && (o[k] = Math.max(0, Math.floor(Number(v)) || 0));
+      return o;
+    },
+    stCanon = (o) => JSON.stringify(Object.keys(o).sort().map((k) => [k, o[k]])),
+    stDirty = !!ve && stKey === stSavedKey && stCanon(stCounts(stDraft)) !== stCanon(stSaved),
+    invList = at.filter((G) => G.name.toLowerCase().includes(invQ.trim().toLowerCase())),
+    invGroups = [
+      ...xt.flatMap((G) => [
+        { id: G.id, heading: G.name, subcategory: "", products: invList.filter((Te) => Te.category_id === G.id) },
+        ...t.categories
+          .filter((Te) => Te.parent_id === G.id)
+          .map((Te) => ({ id: Te.id, heading: G.name, subcategory: Te.name, products: invList.filter((st) => st.category_id === Te.id) })),
+      ]),
+      { id: "uncategorised", heading: "Uncategorised", subcategory: "", products: invList.filter((G) => !G.category_id) },
+    ].filter((G) => G.products.length),
+    soldToday = ve ? lsSold(t, today, ve) : {};
+  (0, wa.useEffect)(() => {
+    // Load the saved stocktake whenever the day or market changes
+    r &&
+      ve &&
+      stKey !== stSavedKey &&
+      (setStDraft(Object.fromEntries(Object.entries(stSaved).map(([k, v]) => [k, String(v)]))), setStKey(stSavedKey), setStMsg(""));
+  }, [stSavedKey, r, stKey]);
+  async function saveStock() {
+    if (ut.current || !ve) return;
+    ((ut.current = !0), s(!0), setStMsg(""));
+    try {
+      (await ha({ action: "stocktake", date: today, market: ve, counts: stCounts(stDraft) }), setStMsg("saved"));
+    } catch (G) {
+      setStMsg(G.message || "Could not save the stocktake.");
+    } finally {
+      ((ut.current = !1), s(!1));
+    }
+  }
+  // ----- Sales tab: password -----
+  async function unlockSales(G) {
+    G.preventDefault();
+    setPwErr("");
+    let f = new FormData(G.currentTarget),
+      pw = String(f.get("pw") || "");
+    try {
+      if (!t.salesPw) {
+        if (pw.length < 4) return setPwErr("Use at least 4 characters.");
+        if (pw !== String(f.get("pw2") || "")) return setPwErr("The two passwords don\u2019t match.");
+        let salt = lsSalt();
+        (await ha({ action: "sales-password", hash: await lsHash(salt, pw), salt }), setSalesOk(!0));
+      } else (await lsHash(t.salesPw.salt, pw)) === t.salesPw.hash ? setSalesOk(!0) : setPwErr("That password is not correct.");
+    } catch (st) {
+      setPwErr(st.message || "Something went wrong. Try again.");
+    }
+  }
+  async function changePw(G) {
+    G.preventDefault();
+    setPwErr("");
+    let f = new FormData(G.currentTarget),
+      cur = String(f.get("cur") || ""),
+      nw = String(f.get("nw") || "");
+    if (nw.length < 4) return setPwErr("Use at least 4 characters.");
+    if (nw !== String(f.get("nw2") || "")) return setPwErr("The new passwords don\u2019t match.");
+    try {
+      let oldHash = await lsHash(t.salesPw.salt, cur);
+      if (oldHash !== t.salesPw.hash) return setPwErr("The current password is not correct.");
+      let salt = lsSalt();
+      (await ha({ action: "sales-password", oldHash, hash: await lsHash(salt, nw), salt }), setPwDlg(!1));
+    } catch (st) {
+      setPwErr(st.message);
+    }
+  }
+  function makePdf(kind, g) {
+    o("");
+    try {
+      let doc =
+        kind === "overall" ? lsOverallPdf(t, g.day, g.market) : kind === "discounts" ? lsDiscountPdf(t, g.day, g.market) : lsSelloutPdf(t, g.day, g.market);
+      lsDeliver(doc, lsFileName(g.day, g.market, kind === "overall" ? "Overall-sales" : kind === "discounts" ? "Discounted-sales" : "Sell-out-report"));
+    } catch (err) {
+      (console.error(err), o("The PDF could not be created. Please try again."));
+    }
+  }
+  let groups = lsSaleGroups(t),
+    grp = groups.find((G) => G.key === selGrp) || groups[0] || null;
   async function wt() {
     o("");
     try {
@@ -8890,7 +9367,7 @@ function m_({ offline: e = !1 } = {}) {
   function sr(G, Te = 1) {
     ((Gt.current = ""),
       B((st) => {
-        let Xt = Math.max(0, Math.min(9999, (st[G.id] || 0) + Te)),
+        let Xt = Math.max(0, Math.min(left(G.id), (st[G.id] || 0) + Te)),
           Sr = { ...st };
         return (Xt ? (Sr[G.id] = Xt) : delete Sr[G.id], Sr);
       }));
@@ -8933,9 +9410,10 @@ function m_({ offline: e = !1 } = {}) {
         let G = await ha({
           action: "sale",
           id: Gt.current,
-          // No cash/card choice any more: sale recorded with method "none"
           cash: 0,
-          method: "none",
+          method: vt,
+          discount: vt === "card" && dsc !== "none" ? dsc : null,
+          staffName: vt === "card" && dsc !== "none" ? dName.trim() : "",
           market: ve,
           lines: dt.map((Te) => ({ id: Te.id, qty: Te.qty })),
         });
@@ -8970,11 +9448,20 @@ function m_({ offline: e = !1 } = {}) {
     if (!(!Y || ut.current)) {
       ((ut.current = !0), s(!0), ue(""));
       try {
-        let G = await ha({
-          action:
-            Y.kind === "product" ? "delete-product" : Y.kind === "market" ? "delete-market" : "delete-category",
-          id: Y.item.id,
-        });
+        let G = await ha(
+          Y.kind === "sales-day"
+            ? { action: "delete-sales", date: Y.item.day, market: Y.item.market }
+            : Y.kind === "sales-all"
+              ? { action: "delete-sales", all: !0 }
+              : Y.kind === "reset-sales"
+                ? { action: "reset-sales" }
+                : {
+                    action:
+                      Y.kind === "product" ? "delete-product" : Y.kind === "market" ? "delete-market" : "delete-category",
+                    id: Y.item.id,
+                  },
+        );
+        (Y.kind === "reset-sales" && setSalesOk(!1), Y.kind.startsWith("sales") && setSelGrp(""));
         Y.kind === "market" && Y.item.name === ve && pickMarket("");
         (Y.kind === "product" &&
           ((Gt.current = ""),
@@ -8998,6 +9485,12 @@ function m_({ offline: e = !1 } = {}) {
       ? "This removes the item from the checkout and the current basket."
       : Y?.kind === "market"
         ? "This removes the market from the list you choose from at the checkout."
+        : Y?.kind === "sales-day"
+          ? "This permanently deletes every sale recorded for this day and market. Download any sheets you need first."
+          : Y?.kind === "sales-all"
+            ? "This permanently deletes every sale recorded in the app. Download any sheets you need first."
+            : Y?.kind === "reset-sales"
+              ? "Without the password, the only way back into Sales is to delete every sales record. Items, headings, markets and today’s stocktake are kept. You will then create a new password."
         : Y?.kind === "category" && Y.item.parent_id
           ? `Items in this subheading will move to ${t.categories.find((G) => G.id === Y.item.parent_id)?.name || "the main heading"}.`
           : "This also removes its subheadings. Its items stay, listed as Uncategorised.";
@@ -9011,7 +9504,8 @@ function m_({ offline: e = !1 } = {}) {
     return (0, T.jsxs)(
       "button",
       {
-        className: "product",
+        className: "product" + (left(G.id) < 1 ? " no-stock" : ""),
+        disabled: left(G.id) < 1 || (c[G.id] || 0) >= left(G.id),
         onClick: () => sr(G),
         "aria-label": `Add ${G.name}, ${ln(G.price)}`,
         children: [
@@ -9027,9 +9521,11 @@ function m_({ offline: e = !1 } = {}) {
             children: [
               (0, T.jsx)("h3", { children: G.name }),
               (0, T.jsx)("span", { className: "price", children: ln(G.price) }),
-              c[G.id]
-                ? (0, T.jsx)("span", { className: "stock in-basket", children: `${c[G.id]} in basket` })
-                : null,
+              left(G.id) < 1
+                ? (0, T.jsx)("span", { className: "stock none", children: "No stock" })
+                : c[G.id]
+                  ? (0, T.jsx)("span", { className: "stock in-basket", children: `${c[G.id]} in basket` })
+                  : null,
             ],
           }),
         ],
@@ -9122,7 +9618,7 @@ function m_({ offline: e = !1 } = {}) {
           (0, T.jsxs)("button", {
             className: "market-button",
             onClick: () => {
-              (u("checkout"), Ue(!0));
+              (l !== "inventory" && u("checkout"), Ue(!0));
             },
             children: [
               (0, T.jsx)("span", { children: ve || "Choose a market" }),
@@ -9143,13 +9639,18 @@ function m_({ offline: e = !1 } = {}) {
         }),
       (0, T.jsxs)(aE, {
         value: l,
-        onValueChange: u,
+        onValueChange: (G) => {
+          // Leaving Inventory with unsaved counts saves them; leaving Sales locks it again
+          (l === "inventory" && stDirty && ve && saveStock(), l === "sales" && G !== "sales" && setSalesOk(!1), u(G));
+        },
         children: [
           (0, T.jsxs)(rE, {
             className: "navigation",
             children: [
               (0, T.jsxs)(Pd, { value: "checkout", children: [(0, T.jsx)(zp, {}), "Checkout"] }),
+              (0, T.jsxs)(Pd, { value: "inventory", children: [(0, T.jsx)(Du, {}), "Inventory"] }),
               (0, T.jsxs)(Pd, { value: "editing", children: [(0, T.jsx)(LsPencil, {}), "Editing"] }),
+              (0, T.jsxs)(Pd, { value: "sales", children: [(0, T.jsx)(Hp, {}), "Sales"] }),
             ],
           }),
           (0, T.jsx)(j0, {
@@ -9171,6 +9672,22 @@ function m_({ offline: e = !1 } = {}) {
                         }),
                       ],
                     }),
+                    ve &&
+                      r &&
+                      !stToday &&
+                      (0, T.jsxs)("div", {
+                        className: "notice stock-notice",
+                        children: [
+                          "No stocktake entered for today at ",
+                          (0, T.jsx)("strong", { children: ve }),
+                          ", so every item shows No stock. ",
+                          (0, T.jsx)("button", {
+                            className: "text-button",
+                            onClick: () => u("inventory"),
+                            children: "Enter today’s stock in Inventory",
+                          }),
+                        ],
+                      }),
                     (0, T.jsxs)("div", {
                       className: "search",
                       children: [
@@ -9355,6 +9872,7 @@ function m_({ offline: e = !1 } = {}) {
                                             (0, T.jsx)("span", { children: G.qty }),
                                             (0, T.jsx)("button", {
                                               "aria-label": "Add one " + G.name,
+                                              disabled: G.qty >= left(G.id),
                                               onClick: () => sr(G),
                                               children: (0, T.jsx)(ts, {}),
                                             }),
@@ -9362,10 +9880,12 @@ function m_({ offline: e = !1 } = {}) {
                                         }),
                                       ],
                                     }),
-                                    !!G.archived &&
+                                    (!!G.archived || G.qty > left(G.id)) &&
                                       (0, T.jsx)("p", {
                                         className: "muted",
-                                        children: "This item is hidden. Remove it before processing the sale.",
+                                        children: G.archived
+                                          ? "This item is hidden. Remove it before processing the sale."
+                                          : `Only ${left(G.id)} left. Reduce the quantity before processing the sale.`,
                                       }),
                                   ],
                                 },
@@ -9401,7 +9921,7 @@ function m_({ offline: e = !1 } = {}) {
                           className: "primary checkout",
                           disabled: !dt.length || da || !!i || !ve,
                           onClick: () => {
-                            (Gt.current || (Gt.current = crypto.randomUUID()), F(""), lt(""), ee(""), S(!0));
+                            (Gt.current || (Gt.current = crypto.randomUUID()), F(""), lt(""), setDsc("none"), setDName(""), ee(""), S(!0));
                           },
                           children: "Process sale",
                         }),
@@ -9410,6 +9930,165 @@ function m_({ offline: e = !1 } = {}) {
                     }),
                   ],
                 }),
+              ],
+            }),
+          }),
+          (0, T.jsx)(j0, {
+            value: "inventory",
+            children: (0, T.jsxs)("section", {
+              className: "page inventory-page",
+              children: [
+                (0, T.jsx)("div", {
+                  className: "section-heading",
+                  children: (0, T.jsxs)("div", {
+                    children: [
+                      (0, T.jsx)("p", { className: "eyebrow", children: "MORNING STOCKTAKE" }),
+                      (0, T.jsx)("h1", { children: "Inventory" }),
+                      ve && (0, T.jsxs)("p", { className: "stock-day", children: [lsDayLabel(today), " \xB7 ", ve] }),
+                    ],
+                  }),
+                }),
+                !ve
+                  ? (0, T.jsxs)("div", {
+                      className: "welcome",
+                      children: [
+                        (0, T.jsx)(LsMapPin, { size: 40, style: { margin: "auto" } }),
+                        (0, T.jsx)("h2", { children: "Choose today’s market first" }),
+                        (0, T.jsx)("p", { children: "The stocktake is kept separately for each market and day." }),
+                        (0, T.jsx)("button", { className: "primary", onClick: () => Ue(!0), children: "Choose market" }),
+                      ],
+                    })
+                  : (0, T.jsxs)(T.Fragment, {
+                      children: [
+                        (0, T.jsx)("div", {
+                          className: "notice",
+                          children:
+                            "Enter how many of each item you have at the start of the day. Items left blank count as 0 and show No stock at the checkout.",
+                        }),
+                        (0, T.jsxs)("div", {
+                          className: "search",
+                          children: [
+                            (0, T.jsx)(E0, { size: 20 }),
+                            (0, T.jsx)("input", {
+                              placeholder: "Find an item…",
+                              value: invQ,
+                              onChange: (G) => setInvQ(G.target.value),
+                              "aria-label": "Find an item to count",
+                            }),
+                          ],
+                        }),
+                        at.length
+                          ? invGroups.length
+                            ? (0, T.jsx)("div", {
+                                className: "stock-list",
+                                children: invGroups.map((g, gi) =>
+                                  (0, T.jsxs)(
+                                    "section",
+                                    {
+                                      className: "stock-group",
+                                      children: [
+                                        (gi === 0 || invGroups[gi - 1].heading !== g.heading) && (0, T.jsx)("h2", { children: g.heading }),
+                                        g.subcategory && (0, T.jsx)("h3", { className: "subcategory-heading", children: g.subcategory }),
+                                        (0, T.jsxs)("div", {
+                                          className: "stock-table",
+                                          children: [
+                                            (0, T.jsxs)("div", {
+                                              className: "stock-row stock-head",
+                                              children: [
+                                                (0, T.jsx)("span", { children: "Item" }),
+                                                (0, T.jsx)("span", { children: "Start count" }),
+                                                (0, T.jsx)("span", { children: "Sold" }),
+                                                (0, T.jsx)("span", { children: "Left" }),
+                                              ],
+                                            }),
+                                            g.products.map((P) => {
+                                              let startN = stCounts(stDraft)[P.id] || 0,
+                                                soldN = soldToday[P.id] || 0,
+                                                leftN = Math.max(0, startN - soldN);
+                                              return (0, T.jsxs)(
+                                                "div",
+                                                {
+                                                  className: "stock-row" + (leftN < 1 ? " is-empty" : ""),
+                                                  children: [
+                                                    (0, T.jsxs)("span", {
+                                                      className: "stock-name",
+                                                      children: [
+                                                        (0, T.jsx)("strong", { children: P.name }),
+                                                        (0, T.jsx)("small", { children: ln(P.price) }),
+                                                      ],
+                                                    }),
+                                                    (0, T.jsx)("span", {
+                                                      children: (0, T.jsx)("input", {
+                                                        type: "number",
+                                                        inputMode: "numeric",
+                                                        min: "0",
+                                                        step: "1",
+                                                        placeholder: "0",
+                                                        "aria-label": "Start count for " + P.name,
+                                                        value: stDraft[P.id] ?? "",
+                                                        onChange: (G) => {
+                                                          let v = G.target.value;
+                                                          (setStDraft((d) => ({ ...d, [P.id]: v })), setStMsg(""));
+                                                        },
+                                                      }),
+                                                    }),
+                                                    (0, T.jsx)("span", { className: "stock-num", children: soldN }),
+                                                    (0, T.jsx)("span", {
+                                                      className: "stock-num" + (leftN < 1 ? " none" : ""),
+                                                      children: leftN < 1 ? "No stock" : leftN,
+                                                    }),
+                                                  ],
+                                                },
+                                                P.id,
+                                              );
+                                            }),
+                                          ],
+                                        }),
+                                      ],
+                                    },
+                                    g.id,
+                                  ),
+                                ),
+                              })
+                            : (0, T.jsxs)("div", {
+                                className: "welcome",
+                                children: [
+                                  (0, T.jsx)("h2", { children: "No items match" }),
+                                  (0, T.jsx)("button", { className: "text-button", onClick: () => setInvQ(""), children: "Show all items" }),
+                                ],
+                              })
+                          : (0, T.jsxs)("div", {
+                              className: "welcome",
+                              children: [
+                                (0, T.jsx)("h2", { children: "No items yet" }),
+                                (0, T.jsx)("p", { children: "Add items in the Editing tab first." }),
+                              ],
+                            }),
+                        // Save bar
+                        (0, T.jsxs)("div", {
+                          className: "stock-save-bar",
+                          children: [
+                            (0, T.jsx)("span", {
+                              className: "stock-save-status" + (stMsg && stMsg !== "saved" ? " error" : ""),
+                              children:
+                                stMsg && stMsg !== "saved"
+                                  ? stMsg
+                                  : stDirty
+                                    ? "Unsaved changes"
+                                    : stToday
+                                      ? "Stocktake saved"
+                                      : "No stocktake saved for today yet",
+                            }),
+                            (0, T.jsx)("button", {
+                              className: "primary",
+                              disabled: A || (!stDirty && !!stToday),
+                              onClick: saveStock,
+                              children: A ? "Saving…" : "Save stocktake",
+                            }),
+                          ],
+                        }),
+                      ],
+                    }),
               ],
             }),
           }),
@@ -9797,6 +10476,212 @@ function m_({ offline: e = !1 } = {}) {
               ],
             }),
           }),
+          (0, T.jsx)(j0, {
+            value: "sales",
+            children: (0, T.jsxs)("section", {
+              className: "page sales-page",
+              children: [
+                (0, T.jsxs)("div", {
+                  className: "section-heading",
+                  children: [
+                    (0, T.jsx)("div", {
+                      children: [
+                        (0, T.jsx)("p", { className: "eyebrow", children: "SALES RECORDS" }),
+                        (0, T.jsx)("h1", { children: "Sales" }),
+                      ],
+                    }),
+                    salesOk &&
+                      (0, T.jsxs)("div", {
+                        className: "row-actions",
+                        children: [
+                          (0, T.jsx)("button", {
+                            className: "secondary",
+                            onClick: () => (setPwErr(""), setPwDlg(!0)),
+                            children: "Change password",
+                          }),
+                          (0, T.jsx)("button", { className: "secondary", onClick: () => setSalesOk(!1), children: "Lock" }),
+                        ],
+                      }),
+                  ],
+                }),
+                !salesOk
+                  ? // ---------- Locked ----------
+                    (0, T.jsxs)("form", {
+                      className: "sales-lock",
+                      onSubmit: unlockSales,
+                      children: [
+                        (0, T.jsx)("h2", { children: t.salesPw ? "Enter the Sales password" : "Create a password for Sales" }),
+                        (0, T.jsx)("p", {
+                          className: "muted",
+                          children: t.salesPw
+                            ? "Sales records are protected."
+                            : "This keeps the sales records private. You will need it every time you open Sales.",
+                        }),
+                        (0, T.jsxs)("label", {
+                          className: "field",
+                          children: [
+                            t.salesPw ? "Password" : "New password",
+                            (0, T.jsx)("input", { name: "pw", type: "password", autoComplete: "off", required: !0 }, "pw-" + !!t.salesPw),
+                          ],
+                        }),
+                        !t.salesPw &&
+                          (0, T.jsxs)("label", {
+                            className: "field",
+                            children: ["Type it again", (0, T.jsx)("input", { name: "pw2", type: "password", autoComplete: "off", required: !0 })],
+                          }),
+                        pwErr && (0, T.jsx)("p", { role: "alert", className: "form-error", children: pwErr }),
+                        (0, T.jsx)("button", {
+                          className: "primary",
+                          disabled: !r,
+                          children: t.salesPw ? "Open Sales" : "Create password",
+                        }),
+                        t.salesPw &&
+                          (0, T.jsx)("button", {
+                            type: "button",
+                            className: "text-button",
+                            onClick: () => Gr({ kind: "reset-sales", item: { id: "reset", name: "the Sales password and all sales records" } }),
+                            children: "Forgot the password?",
+                          }),
+                      ],
+                    })
+                  : // ---------- Unlocked ----------
+                    groups.length
+                    ? (0, T.jsxs)(T.Fragment, {
+                        children: [
+                          (0, T.jsx)("p", { className: "sale-step", children: "Choose a market day" }),
+                          (0, T.jsx)("div", {
+                            className: "category-chips day-chips",
+                            children: groups.map((g) =>
+                              (0, T.jsxs)(
+                                "button",
+                                {
+                                  "aria-pressed": grp && g.key === grp.key,
+                                  onClick: () => setSelGrp(g.key),
+                                  children: [(0, T.jsx)("strong", { children: lsDayLabel(g.day) }), (0, T.jsx)("span", { children: g.market })],
+                                },
+                                g.key,
+                              ),
+                            ),
+                          }),
+                          grp &&
+                            (() => {
+                              let daySales = grp.sales,
+                                tk = daySales.reduce((a2, x2) => a2 + x2.total, 0),
+                                it2 = daySales.reduce((a2, x2) => a2 + x2.lines.reduce((b2, l2) => b2 + l2.qty, 0), 0),
+                                dc = daySales.reduce((a2, x2) => a2 + (x2.discount_amount || 0), 0);
+                              return (0, T.jsxs)(T.Fragment, {
+                                children: [
+                                  (0, T.jsxs)("h2", { className: "sales-day-title", children: [lsDayLabel(grp.day), " \xB7 ", grp.market] }),
+                                  (0, T.jsx)("div", {
+                                    className: "stats",
+                                    children: [
+                                      ["Takings", ln(tk)],
+                                      ["Sales", daySales.length],
+                                      ["Items sold", it2],
+                                      ["Discounts given", ln(dc)],
+                                    ].map(([k2, v2]) =>
+                                      (0, T.jsxs)(
+                                        "div",
+                                        { className: "stat", children: [(0, T.jsx)("p", { children: k2 }), (0, T.jsx)("strong", { children: v2 })] },
+                                        k2,
+                                      ),
+                                    ),
+                                  }),
+                                  (0, T.jsx)("p", { className: "sale-step", children: "Download sheets (PDF)" }),
+                                  (0, T.jsx)("div", {
+                                    className: "export-buttons",
+                                    children: [
+                                      ["overall", "Overall sales of the day"],
+                                      ["discounts", "Discounted sales"],
+                                      ["sellout", "Sell-out report"],
+                                    ].map(([k2, lbl]) =>
+                                      (0, T.jsxs)(
+                                        "button",
+                                        {
+                                          className: k2 === "overall" ? "primary" : "secondary",
+                                          onClick: () => makePdf(k2, grp),
+                                          children: [(0, T.jsx)(zo, {}), lbl],
+                                        },
+                                        k2,
+                                      ),
+                                    ),
+                                  }),
+                                  (0, T.jsx)("h2", { style: { marginTop: 28 }, children: "Sales on this day" }),
+                                  (0, T.jsx)("div", {
+                                    className: "table-wrap",
+                                    children: (0, T.jsxs)(nE, {
+                                      children: [
+                                        (0, T.jsx)(iE, {
+                                          children: (0, T.jsxs)(X0, {
+                                            children: ["Time", "Items", "Payment", "Discount", "Total", ""].map((h2, hi) =>
+                                              (0, T.jsx)(As, { children: h2 }, hi),
+                                            ),
+                                          }),
+                                        }),
+                                        (0, T.jsx)(oE, {
+                                          children: [...daySales]
+                                            .sort((a2, b2) => b2.at.localeCompare(a2.at))
+                                            .map((x2) =>
+                                              (0, T.jsxs)(
+                                                X0,
+                                                {
+                                                  children: [
+                                                    (0, T.jsx)(ss, { children: lsTime(x2.at) }),
+                                                    (0, T.jsx)(ss, { children: x2.lines.reduce((b2, l2) => b2 + l2.qty, 0) }),
+                                                    (0, T.jsx)(ss, { children: lsMethod(x2.method) }),
+                                                    (0, T.jsx)(ss, {
+                                                      children: x2.discount_type
+                                                        ? lsDiscountLabel(x2) + (x2.staff_name ? " \xB7 " + x2.staff_name : "")
+                                                        : "—",
+                                                    }),
+                                                    (0, T.jsx)(ss, { children: ln(x2.total) }),
+                                                    (0, T.jsx)(ss, {
+                                                      children: (0, T.jsx)("button", { className: "secondary", onClick: () => k(x2), children: "View" }),
+                                                    }),
+                                                  ],
+                                                },
+                                                x2.id,
+                                              ),
+                                            ),
+                                        }),
+                                      ],
+                                    }),
+                                  }),
+                                  (0, T.jsxs)("div", {
+                                    className: "sales-danger",
+                                    children: [
+                                      (0, T.jsxs)("button", {
+                                        className: "danger-outline",
+                                        onClick: () =>
+                                          Gr({
+                                            kind: "sales-day",
+                                            item: { id: grp.key, name: "sales for " + lsDayLabel(grp.day) + " \xB7 " + grp.market, day: grp.day, market: grp.market },
+                                          }),
+                                        children: [(0, T.jsx)(yd, {}), "Delete this day’s sales"],
+                                      }),
+                                      (0, T.jsxs)("button", {
+                                        className: "danger-outline",
+                                        onClick: () => Gr({ kind: "sales-all", item: { id: "all", name: "all sales" } }),
+                                        children: [(0, T.jsx)(yd, {}), "Delete all sales"],
+                                      }),
+                                    ],
+                                  }),
+                                ],
+                              });
+                            })(),
+                        ],
+                      })
+                    : (0, T.jsxs)("div", {
+                        className: "welcome",
+                        children: [
+                          (0, T.jsx)(Hp, { size: 36, style: { margin: "auto" } }),
+                          (0, T.jsx)("h2", { children: "No sales recorded" }),
+                          (0, T.jsx)("p", { children: "Completed sales will appear here, grouped by day and market." }),
+                        ],
+                      }),
+              ],
+            }),
+          }),
         ],
       }),
       (0, T.jsx)(Md, {
@@ -10105,6 +10990,12 @@ function m_({ offline: e = !1 } = {}) {
                         ? "item"
                         : Y?.kind === "market"
                           ? "market"
+                          : Y?.kind === "sales-day"
+                            ? "these sales"
+                            : Y?.kind === "sales-all"
+                              ? "all sales"
+                              : Y?.kind === "reset-sales"
+                                ? "sales and reset"
                           : Y?.kind === "category" && Y.item.parent_id
                             ? "subheading"
                             : "heading"),
@@ -10166,7 +11057,7 @@ function m_({ offline: e = !1 } = {}) {
       }),
       // Market picker (checkout only): choose from the preset markets set up in Editing
       (0, T.jsx)(Md, {
-        open: be && l === "checkout" && r,
+        open: be && (l === "checkout" || l === "inventory") && r,
         onOpenChange: (G) => {
           ve && Ue(G);
         },
@@ -10290,6 +11181,34 @@ function m_({ offline: e = !1 } = {}) {
           ],
         }),
       }),
+      // Change the Sales password
+      (0, T.jsx)(Md, {
+        open: pwDlg,
+        onOpenChange: (G) => !G && !A && setPwDlg(!1),
+        children: (0, T.jsxs)(Hd, {
+          className: "dialog-box",
+          children: [
+            (0, T.jsx)(qd, { children: "Change the Sales password" }),
+            (0, T.jsx)(zd, { children: "Enter the current password, then the new one twice." }),
+            (0, T.jsxs)("form", {
+              onSubmit: changePw,
+              children: [
+                (0, T.jsxs)("label", { className: "field", children: ["Current password", (0, T.jsx)("input", { name: "cur", type: "password", required: !0 })] }),
+                (0, T.jsxs)("label", { className: "field", children: ["New password", (0, T.jsx)("input", { name: "nw", type: "password", required: !0 })] }),
+                (0, T.jsxs)("label", { className: "field", children: ["New password again", (0, T.jsx)("input", { name: "nw2", type: "password", required: !0 })] }),
+                pwErr && (0, T.jsx)("p", { role: "alert", className: "form-error", children: pwErr }),
+                (0, T.jsxs)("div", {
+                  className: "dialog-actions",
+                  children: [
+                    (0, T.jsx)("button", { type: "button", className: "secondary", onClick: () => setPwDlg(!1), children: "Cancel" }),
+                    (0, T.jsx)("button", { className: "primary", disabled: A, children: "Save new password" }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+      }),
       (0, T.jsx)(Md, {
         open: w,
         onOpenChange: (G) => {
@@ -10300,61 +11219,141 @@ function m_({ offline: e = !1 } = {}) {
           children: [
             (0, T.jsx)(qd, { children: "Process sale" }),
             (0, T.jsx)(zd, { children: ve }),
-            (0, T.jsxs)("div", {
-              className: "payment-total",
-              children: [
-                (0, T.jsx)("p", { children: "Total" }),
-                (0, T.jsx)("strong", { children: ln(Jt) }),
-                ft !== Jt && (0, T.jsxs)("p", { children: ["Paid in cash: ", ln(ft), " (rounded)"] }),
-              ],
+            // Step 1: cash or card
+            (0, T.jsx)("p", { className: "sale-step", children: "1. How is the customer paying?" }),
+            (0, T.jsx)(aE, {
+              value: vt,
+              // Only a tap chooses the payment type (focus alone must not pick Cash)
+              activationMode: "manual",
+              onValueChange: (G) => {
+                A || (lt(G), ee(""), G === "cash" && (setDsc("none"), setDName("")));
+              },
+              children: (0, T.jsxs)(rE, {
+                className: "payment-methods",
+                children: [
+                  (0, T.jsx)(Pd, { value: "cash", disabled: A, children: "Cash" }),
+                  (0, T.jsx)(Pd, { value: "card", disabled: A, children: "Card" }),
+                ],
+              }),
             }),
-            // Optional change calculator (not required to complete the sale)
-            (0, T.jsxs)("label", {
-              className: "field",
-              children: [
-                "Cash received (optional, to work out change)",
-                (0, T.jsx)("input", {
-                  type: "number",
-                  inputMode: "decimal",
-                  min: "0",
-                  step: "0.05",
-                  value: L,
-                  onChange: (G) => F(G.target.value),
-                  placeholder: "0.00",
-                }),
-              ],
-            }),
-            (0, T.jsx)("div", {
-              className: "quick-cash",
-              children: Array.from(new Set([ft, ...[500, 1e3, 2e3, 5e3, 1e4].filter((G) => G > ft)]))
-                .slice(0, 4)
-                .map((G) =>
-                  (0, T.jsx)(
-                    "button",
-                    {
-                      className: "secondary",
-                      onClick: () => F((G / 100).toFixed(2)),
-                      children: G === ft ? "Exact" : ln(G),
-                    },
-                    G,
-                  ),
-                ),
-            }),
-            (0, T.jsxs)("div", {
-              className: "change",
-              children: [
-                (0, T.jsx)("span", { children: "Change to give" }),
-                (0, T.jsx)("strong", {
-                  "aria-live": "polite",
-                  children:
-                    L === ""
-                      ? "—"
-                      : Number.isFinite(Rf(L)) && Rf(L) >= ft
-                        ? ln(Rf(L) - ft)
-                        : "Not enough",
-                }),
-              ],
-            }),
+            vt === "" && (0, T.jsx)("p", { className: "muted", children: "Choose cash or card to continue." }),
+            // Step 2 (card only): sale options
+            vt === "card" &&
+              (0, T.jsxs)(T.Fragment, {
+                children: [
+                  (0, T.jsx)("p", { className: "sale-step", children: "2. Sale option" }),
+                  (0, T.jsx)("div", {
+                    className: "category-chips sale-options",
+                    children: [
+                      ["none", "No discount"],
+                      ["staff20", "Staff 20%"],
+                      ["stall10", "Stallholder 10%"],
+                    ].map(([k, lbl]) =>
+                      (0, T.jsx)(
+                        "button",
+                        {
+                          type: "button",
+                          "aria-pressed": dsc === k,
+                          disabled: A,
+                          onClick: () => (setDsc(k), ee("")),
+                          children: lbl,
+                        },
+                        k,
+                      ),
+                    ),
+                  }),
+                  dsc !== "none" &&
+                    (0, T.jsxs)("label", {
+                      className: "field",
+                      children: [
+                        dsc === "staff20" ? "Staff member’s name" : "Name of staff member completing the sale",
+                        (0, T.jsx)("input", {
+                          value: dName,
+                          maxLength: 60,
+                          autoComplete: "off",
+                          onChange: (G) => setDName(G.target.value),
+                          placeholder: "Type a name",
+                        }),
+                      ],
+                    }),
+                ],
+              }),
+            // Price breakdown
+            vt !== "" &&
+              (0, T.jsxs)("div", {
+                className: "price-breakdown",
+                children: [
+                  (0, T.jsxs)("div", { children: [(0, T.jsx)("span", { children: "Items" }), (0, T.jsx)("span", { children: ln(Jt) })] }),
+                  pr.discount > 0 &&
+                    (0, T.jsxs)("div", {
+                      className: "discount-row",
+                      children: [
+                        (0, T.jsx)("span", { children: LS_DISCOUNTS[pr.type].label + (vt === "cash" ? " (automatic)" : "") }),
+                        (0, T.jsx)("span", { children: "−" + ln(pr.discount) }),
+                      ],
+                    }),
+                  pr.rounding !== 0 &&
+                    (0, T.jsxs)("div", {
+                      children: [
+                        (0, T.jsx)("span", { children: "Cash rounding" }),
+                        (0, T.jsx)("span", { children: (pr.rounding < 0 ? "−" : "+") + ln(Math.abs(pr.rounding)) }),
+                      ],
+                    }),
+                ],
+              }),
+            vt !== "" &&
+              (0, T.jsxs)("div", {
+                className: "payment-total",
+                children: [(0, T.jsx)("p", { children: "Customer pays" }), (0, T.jsx)("strong", { children: ln(ft) })],
+              }),
+            // Cash: optional change calculator
+            vt === "cash" &&
+              (0, T.jsxs)(T.Fragment, {
+                children: [
+                  (0, T.jsxs)("label", {
+                    className: "field",
+                    children: [
+                      "Cash received (optional, to work out change)",
+                      (0, T.jsx)("input", {
+                        type: "number",
+                        inputMode: "decimal",
+                        min: "0",
+                        step: "0.05",
+                        value: L,
+                        onChange: (G) => F(G.target.value),
+                        placeholder: "0.00",
+                      }),
+                    ],
+                  }),
+                  (0, T.jsx)("div", {
+                    className: "quick-cash",
+                    children: Array.from(new Set([ft, ...[500, 1e3, 2e3, 5e3, 1e4].filter((G) => G > ft)]))
+                      .slice(0, 4)
+                      .map((G) =>
+                        (0, T.jsx)(
+                          "button",
+                          { className: "secondary", onClick: () => F((G / 100).toFixed(2)), children: G === ft ? "Exact" : ln(G) },
+                          G,
+                        ),
+                      ),
+                  }),
+                  (0, T.jsxs)("div", {
+                    className: "change",
+                    children: [
+                      (0, T.jsx)("span", { children: "Change to give" }),
+                      (0, T.jsx)("strong", {
+                        "aria-live": "polite",
+                        children: L === "" ? "—" : Number.isFinite(Rf(L)) && Rf(L) >= ft ? ln(Rf(L) - ft) : "Not enough",
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+            vt === "card" &&
+              (0, T.jsxs)("div", {
+                className: "notice",
+                children: ["Take ", ln(ft), " on the card reader, then confirm below."],
+              }),
             te &&
               (0, T.jsxs)("p", {
                 role: "alert",
@@ -10371,12 +11370,19 @@ function m_({ offline: e = !1 } = {}) {
                   }),
                 ],
               }),
-            (0, T.jsx)("button", {
-              className: "primary checkout",
-              disabled: A || da,
-              onClick: Ln,
-              children: A ? "Saving…" : "Complete sale",
-            }),
+            vt !== "" &&
+              (0, T.jsx)("button", {
+                className: "primary checkout",
+                disabled: A || da || (vt === "card" && dsc !== "none" && !dName.trim()),
+                onClick: Ln,
+                children: A
+                  ? "Saving…"
+                  : vt === "card"
+                    ? dsc !== "none" && !dName.trim()
+                      ? "Enter the staff name to continue"
+                      : "Card payment received — complete sale"
+                    : "Complete cash sale",
+              }),
           ],
         }),
       }),
@@ -10425,7 +11431,7 @@ function m_({ offline: e = !1 } = {}) {
           className: "dialog-box",
           children: [
             (0, T.jsx)(qd, { children: "Sale details" }),
-            (0, T.jsx)(zd, { children: z && `${z.market} \xB7 ${Af(z.at)} Brisbane \xB7 ${Ds(z.method)}` }),
+            (0, T.jsx)(zd, { children: z && `${z.market} \xB7 ${lsDayLabel(lsSaleDay(z))} ${lsTime(z.at)} \xB7 ${lsMethod(z.method)}` }),
             z &&
               (0, T.jsxs)(T.Fragment, {
                 children: [
@@ -10450,13 +11456,18 @@ function m_({ offline: e = !1 } = {}) {
                       ),
                     ),
                   }),
-                  z.method === "cash" &&
+                  !!z.discount_amount &&
                     (0, T.jsxs)("div", {
                       className: "line-title",
                       children: [
-                        (0, T.jsx)("span", { children: "Cash rounding" }),
-                        (0, T.jsx)("span", { children: ln(z.total - z.subtotal) }),
+                        (0, T.jsx)("span", { children: lsDiscountLabel(z) + (z.staff_name ? " \xB7 " + z.staff_name : "") }),
+                        (0, T.jsx)("span", { children: "\u2212" + ln(z.discount_amount) }),
                       ],
+                    }),
+                  !!z.rounding &&
+                    (0, T.jsxs)("div", {
+                      className: "line-title",
+                      children: [(0, T.jsx)("span", { children: "Cash rounding" }), (0, T.jsx)("span", { children: ln(z.rounding) })],
                     }),
                   (0, T.jsxs)("div", {
                     className: "total",
@@ -10465,8 +11476,7 @@ function m_({ offline: e = !1 } = {}) {
                       (0, T.jsx)("strong", { children: ln(z.total) }),
                     ],
                   }),
-                  z.method === "cash" &&
-                    (0, T.jsxs)("p", { children: ["Received ", ln(z.cash), " \xB7 Change ", ln(z.change)] }),
+
                 ],
               }),
           ],
