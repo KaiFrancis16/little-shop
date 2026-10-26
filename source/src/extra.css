@@ -371,3 +371,10 @@
   margin-left: auto;
   flex: 0 0 auto;
 }
+.editing-page .section-heading > .row-actions {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.inventory-browser {
+  margin: 12px 0 4px;
+}

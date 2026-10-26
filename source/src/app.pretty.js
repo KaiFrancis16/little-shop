@@ -9068,6 +9068,11 @@ function m_({ offline: e = !1 } = {}) {
     [stMsg, setStMsg] = (0, wa.useState)(""),
     // Sales tab (password protected)
     [salesOk, setSalesOk] = (0, wa.useState)(!1),
+    // Editing tab uses the same password as Sales
+    [editOk, setEditOk] = (0, wa.useState)(!1),
+    // Inventory heading / subheading filters (same as the checkout)
+    [invCat, setInvCat] = (0, wa.useState)("all"),
+    [invSub, setInvSub] = (0, wa.useState)("all"),
     [pwErr, setPwErr] = (0, wa.useState)(""),
     [selGrp, setSelGrp] = (0, wa.useState)(""),
     [pwDlg, setPwDlg] = (0, wa.useState)(!1),
@@ -9185,7 +9190,12 @@ function m_({ offline: e = !1 } = {}) {
     },
     stCanon = (o) => JSON.stringify(Object.keys(o).sort().map((k) => [k, o[k]])),
     stDirty = !!ve && stKey === stSavedKey && stCanon(stCounts(stDraft)) !== stCanon(stSaved),
-    invList = at.filter((G) => G.name.toLowerCase().includes(invQ.trim().toLowerCase())),
+    invList = at.filter(
+      (G) =>
+        G.name.toLowerCase().includes(invQ.trim().toLowerCase()) &&
+        (invCat === "all" || G.category_id === invCat || t.categories.some((Te) => Te.id === G.category_id && Te.parent_id === invCat)) &&
+        (invSub === "all" || G.category_id === invSub),
+    ),
     invGroups = [
       ...xt.flatMap((G) => [
         { id: G.id, heading: G.name, subcategory: "", products: invList.filter((Te) => Te.category_id === G.id) },
@@ -9215,8 +9225,9 @@ function m_({ offline: e = !1 } = {}) {
     }
   }
   // ----- Sales tab: password -----
-  async function unlockSales(G) {
+  async function unlockSales(G, where = "sales") {
     G.preventDefault();
+    let open = () => (where === "editing" ? setEditOk(!0) : setSalesOk(!0));
     setPwErr("");
     let f = new FormData(G.currentTarget),
       pw = String(f.get("pw") || "");
@@ -9225,8 +9236,8 @@ function m_({ offline: e = !1 } = {}) {
         if (pw.length < 4) return setPwErr("Use at least 4 characters.");
         if (pw !== String(f.get("pw2") || "")) return setPwErr("The two passwords don\u2019t match.");
         let salt = lsSalt();
-        (await ha({ action: "sales-password", hash: await lsHash(salt, pw), salt }), setSalesOk(!0));
-      } else (await lsHash(t.salesPw.salt, pw)) === t.salesPw.hash ? setSalesOk(!0) : setPwErr("That password is not correct.");
+        (await ha({ action: "sales-password", hash: await lsHash(salt, pw), salt }), open());
+      } else (await lsHash(t.salesPw.salt, pw)) === t.salesPw.hash ? open() : setPwErr("That password is not correct.");
     } catch (st) {
       setPwErr(st.message || "Something went wrong. Try again.");
     }
@@ -9258,6 +9269,73 @@ function m_({ offline: e = !1 } = {}) {
       (console.error(err), o("The PDF could not be created. Please try again."));
     }
   }
+  // Password screen shared by Editing and Sales (one password for both)
+  function lockForm(where) {
+    let name = where === "editing" ? "Editing" : "Sales";
+    return (0, T.jsxs)(
+      "form",
+      {
+        className: "sales-lock",
+        onSubmit: (G) => unlockSales(G, where),
+        children: [
+          (0, T.jsx)("h2", { children: t.salesPw ? "Enter the password to open " + name : "Create a password" }),
+          (0, T.jsx)("p", {
+            className: "muted",
+            children: t.salesPw
+              ? name === "Editing"
+                ? "Changing items, headings and markets is protected."
+                : "Sales records are protected."
+              : "One password protects both Editing and Sales. You will need it each time you open them.",
+          }),
+          (0, T.jsxs)("label", {
+            className: "field",
+            children: [
+              t.salesPw ? "Password" : "New password",
+              (0, T.jsx)("input", { name: "pw", type: "password", autoComplete: "off", required: !0 }, "pw-" + where + !!t.salesPw),
+            ],
+          }),
+          !t.salesPw &&
+            (0, T.jsxs)("label", {
+              className: "field",
+              children: ["Type it again", (0, T.jsx)("input", { name: "pw2", type: "password", autoComplete: "off", required: !0 })],
+            }),
+          pwErr && (0, T.jsx)("p", { role: "alert", className: "form-error", children: pwErr }),
+          (0, T.jsx)("button", { className: "primary", disabled: !r, children: t.salesPw ? "Open " + name : "Create password" }),
+          t.salesPw &&
+            (0, T.jsx)("button", {
+              type: "button",
+              className: "text-button",
+              onClick: () => Gr({ kind: "reset-sales", item: { id: "reset", name: "the password and all sales records" } }),
+              children: "Forgot the password?",
+            }),
+        ],
+      },
+      "lock-" + where,
+    );
+  }
+  let editHead = (0, T.jsxs)(
+    "div",
+    {
+      className: "section-heading",
+      children: [
+        (0, T.jsxs)("div", {
+          children: [
+            (0, T.jsx)("p", { className: "eyebrow", children: "BEHIND THE COUNTER" }),
+            (0, T.jsx)("h1", { children: "Editing" }),
+          ],
+        }),
+        editOk &&
+          (0, T.jsxs)("div", {
+            className: "row-actions",
+            children: [
+              (0, T.jsx)("button", { className: "secondary", onClick: () => (setPwErr(""), setPwDlg(!0)), children: "Change password" }),
+              (0, T.jsx)("button", { className: "secondary", onClick: () => setEditOk(!1), children: "Lock" }),
+            ],
+          }),
+      ],
+    },
+    "edit-head",
+  );
   let groups = lsSaleGroups(t),
     grp = groups.find((G) => G.key === selGrp) || groups[0] || null;
   async function wt() {
@@ -9269,6 +9347,8 @@ function m_({ offline: e = !1 } = {}) {
       (a(Te),
         de((st) => (st === "all" || Te.categories.some((Xt) => Xt.id === st) ? st : "all")),
         se((st) => (st === "all" || Te.categories.some((Xt) => Xt.id === st) ? st : "all")),
+        setInvCat((st) => (st === "all" || Te.categories.some((Xt) => Xt.id === st) ? st : "all")),
+        setInvSub((st) => (st === "all" || Te.categories.some((Xt) => Xt.id === st) ? st : "all")),
         B((st) =>
           Object.fromEntries(Object.entries(st).filter(([Xt]) => Te.products.some((Sr) => Sr.id === Xt))),
         ),
@@ -9461,7 +9541,7 @@ function m_({ offline: e = !1 } = {}) {
                     id: Y.item.id,
                   },
         );
-        (Y.kind === "reset-sales" && setSalesOk(!1), Y.kind.startsWith("sales") && setSelGrp(""));
+        (Y.kind === "reset-sales" && (setSalesOk(!1), setEditOk(!1)), Y.kind.startsWith("sales") && setSelGrp(""));
         Y.kind === "market" && Y.item.name === ve && pickMarket("");
         (Y.kind === "product" &&
           ((Gt.current = ""),
@@ -9490,7 +9570,7 @@ function m_({ offline: e = !1 } = {}) {
           : Y?.kind === "sales-all"
             ? "This permanently deletes every sale recorded in the app. Download any sheets you need first."
             : Y?.kind === "reset-sales"
-              ? "Without the password, the only way back into Sales is to delete every sales record. Items, headings, markets and today’s stocktake are kept. You will then create a new password."
+              ? "Without the password, the only way back into Editing and Sales is to delete every sales record. Items, headings, markets and today’s stocktake are kept. You will then create a new password."
         : Y?.kind === "category" && Y.item.parent_id
           ? `Items in this subheading will move to ${t.categories.find((G) => G.id === Y.item.parent_id)?.name || "the main heading"}.`
           : "This also removes its subheadings. Its items stay, listed as Uncategorised.";
@@ -9641,7 +9721,7 @@ function m_({ offline: e = !1 } = {}) {
         value: l,
         onValueChange: (G) => {
           // Leaving Inventory with unsaved counts saves them; leaving Sales locks it again
-          (l === "inventory" && stDirty && ve && saveStock(), l === "sales" && G !== "sales" && setSalesOk(!1), u(G));
+          (l === "inventory" && stDirty && ve && saveStock(), l === "sales" && G !== "sales" && setSalesOk(!1), l === "editing" && G !== "editing" && setEditOk(!1), setPwErr(""), u(G));
         },
         children: [
           (0, T.jsxs)(rE, {
@@ -9977,6 +10057,53 @@ function m_({ offline: e = !1 } = {}) {
                             }),
                           ],
                         }),
+                        // Heading and subheading buttons, the same as the checkout
+                        xt.length > 0 &&
+                          (0, T.jsxs)("div", {
+                            className: "category-browser inventory-browser",
+                            children: [
+                              (0, T.jsxs)("div", {
+                                className: "category-chips",
+                                "aria-label": "Show heading",
+                                children: [
+                                  (0, T.jsx)("button", {
+                                    "aria-pressed": invCat === "all",
+                                    onClick: () => (setInvCat("all"), setInvSub("all")),
+                                    children: "All items",
+                                  }),
+                                  xt.map((G) =>
+                                    (0, T.jsx)(
+                                      "button",
+                                      { "aria-pressed": invCat === G.id, onClick: () => (setInvCat(G.id), setInvSub("all")), children: G.name },
+                                      G.id,
+                                    ),
+                                  ),
+                                ],
+                              }),
+                              invCat !== "all" &&
+                                t.categories.some((G) => G.parent_id === invCat) &&
+                                (0, T.jsxs)("div", {
+                                  className: "category-chips subcategory-chips",
+                                  "aria-label": "Show subheading",
+                                  children: [
+                                    (0, T.jsxs)("button", {
+                                      "aria-pressed": invSub === "all",
+                                      onClick: () => setInvSub("all"),
+                                      children: ["All ", t.categories.find((G) => G.id === invCat)?.name],
+                                    }),
+                                    t.categories
+                                      .filter((G) => G.parent_id === invCat)
+                                      .map((G) =>
+                                        (0, T.jsx)(
+                                          "button",
+                                          { "aria-pressed": invSub === G.id, onClick: () => setInvSub(G.id), children: G.name },
+                                          G.id,
+                                        ),
+                                      ),
+                                  ],
+                                }),
+                            ],
+                          }),
                         at.length
                           ? invGroups.length
                             ? (0, T.jsx)("div", {
@@ -10054,7 +10181,11 @@ function m_({ offline: e = !1 } = {}) {
                                 className: "welcome",
                                 children: [
                                   (0, T.jsx)("h2", { children: "No items match" }),
-                                  (0, T.jsx)("button", { className: "text-button", onClick: () => setInvQ(""), children: "Show all items" }),
+                                  (0, T.jsx)("button", {
+                                    className: "text-button",
+                                    onClick: () => (setInvQ(""), setInvCat("all"), setInvSub("all")),
+                                    children: "Show all items",
+                                  }),
                                 ],
                               })
                           : (0, T.jsxs)("div", {
@@ -10096,16 +10227,11 @@ function m_({ offline: e = !1 } = {}) {
             value: "editing",
             children: (0, T.jsxs)("section", {
               className: "page editing-page",
-              children: [
-                (0, T.jsx)("div", {
-                  className: "section-heading",
-                  children: (0, T.jsxs)("div", {
-                    children: [
-                      (0, T.jsx)("p", { className: "eyebrow", children: "BEHIND THE COUNTER" }),
-                      (0, T.jsx)("h1", { children: "Editing" }),
-                    ],
-                  }),
-                }),
+              // Locked: just the heading and the password screen
+              children: !editOk
+                ? [editHead, lockForm("editing")]
+                : [
+                editHead,
                 (0, T.jsx)("div", {
                   className: "notice",
                   children:
@@ -10505,45 +10631,7 @@ function m_({ offline: e = !1 } = {}) {
                   ],
                 }),
                 !salesOk
-                  ? // ---------- Locked ----------
-                    (0, T.jsxs)("form", {
-                      className: "sales-lock",
-                      onSubmit: unlockSales,
-                      children: [
-                        (0, T.jsx)("h2", { children: t.salesPw ? "Enter the Sales password" : "Create a password for Sales" }),
-                        (0, T.jsx)("p", {
-                          className: "muted",
-                          children: t.salesPw
-                            ? "Sales records are protected."
-                            : "This keeps the sales records private. You will need it every time you open Sales.",
-                        }),
-                        (0, T.jsxs)("label", {
-                          className: "field",
-                          children: [
-                            t.salesPw ? "Password" : "New password",
-                            (0, T.jsx)("input", { name: "pw", type: "password", autoComplete: "off", required: !0 }, "pw-" + !!t.salesPw),
-                          ],
-                        }),
-                        !t.salesPw &&
-                          (0, T.jsxs)("label", {
-                            className: "field",
-                            children: ["Type it again", (0, T.jsx)("input", { name: "pw2", type: "password", autoComplete: "off", required: !0 })],
-                          }),
-                        pwErr && (0, T.jsx)("p", { role: "alert", className: "form-error", children: pwErr }),
-                        (0, T.jsx)("button", {
-                          className: "primary",
-                          disabled: !r,
-                          children: t.salesPw ? "Open Sales" : "Create password",
-                        }),
-                        t.salesPw &&
-                          (0, T.jsx)("button", {
-                            type: "button",
-                            className: "text-button",
-                            onClick: () => Gr({ kind: "reset-sales", item: { id: "reset", name: "the Sales password and all sales records" } }),
-                            children: "Forgot the password?",
-                          }),
-                      ],
-                    })
+                  ? lockForm("sales")
                   : // ---------- Unlocked ----------
                     groups.length
                     ? (0, T.jsxs)(T.Fragment, {
@@ -11188,8 +11276,8 @@ function m_({ offline: e = !1 } = {}) {
         children: (0, T.jsxs)(Hd, {
           className: "dialog-box",
           children: [
-            (0, T.jsx)(qd, { children: "Change the Sales password" }),
-            (0, T.jsx)(zd, { children: "Enter the current password, then the new one twice." }),
+            (0, T.jsx)(qd, { children: "Change the password" }),
+            (0, T.jsx)(zd, { children: "This password opens both Editing and Sales. Enter the current password, then the new one twice." }),
             (0, T.jsxs)("form", {
               onSubmit: changePw,
               children: [
