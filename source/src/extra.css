@@ -378,3 +378,188 @@
 .inventory-browser {
   margin: 12px 0 4px;
 }
+
+/* ---------- Round 6: larger headings, stock presets ---------- */
+/* Headings and subheadings on Checkout and Inventory: larger and easier to read */
+.offline-app .catalog-group > h2,
+.offline-app .stock-group > h2 {
+  font-size: 28px;
+  font-weight: 750;
+  color: #16281e;
+  margin: 0 0 14px;
+  letter-spacing: -0.01em;
+}
+.offline-app .catalog-group {
+  margin-top: 34px;
+}
+.offline-app .subcategory-heading {
+  margin: 20px 0 12px;
+  padding-left: 12px;
+  border-left: 4px solid #126448;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #24402f;
+}
+@media (min-width: 820px) and (max-width: 1050px) {
+  .offline-app .catalog-group > h2,
+  .offline-app .stock-group > h2 {
+    font-size: 25px;
+  }
+  .offline-app .subcategory-heading {
+    font-size: 18px;
+  }
+}
+
+/* Stock presets */
+.preset-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin: 14px 0;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.preset-bar-text {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 260px;
+}
+.preset-bar-text strong {
+  font-size: 17px;
+}
+.preset-bar-text span {
+  color: #62736a;
+  font-size: 14px;
+}
+.preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.preset-load {
+  min-height: 48px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  background: #126448;
+  color: #fff;
+  font-size: 15px;
+}
+.preset-load strong {
+  margin-left: 4px;
+}
+.preset-load:disabled {
+  opacity: 0.6;
+}
+.preset-manage {
+  margin-top: 10px;
+}
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid #edf2ef;
+}
+.preset-row span {
+  display: grid;
+}
+.preset-row small {
+  color: #6b7b71;
+}
+/* Simple pop-up used for stock presets */
+.ls-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.5);
+}
+.ls-modal {
+  position: relative;
+  width: 100%;
+  max-width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  padding: 24px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+}
+.ls-modal-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 650;
+}
+.ls-modal-desc {
+  margin: 0 0 14px;
+  font-size: 14px;
+}
+
+/* ---------- Round 7: Stocktake tab ---------- */
+.stk-presets {
+  margin: 6px 0 4px;
+}
+.stk-new {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  border-style: dashed !important;
+}
+.stk-copy {
+  margin: 14px 0 6px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.stk-copy summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #126448;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+.stk-copy p {
+  margin: 6px 0 10px;
+  font-size: 14px;
+}
+.stk-copy-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.stk-copy-list button {
+  display: grid !important;
+  text-align: left;
+  gap: 2px;
+  padding: 10px 16px;
+}
+.stk-copy-list button span {
+  font-size: 13px;
+  font-weight: 400;
+  color: #62736a;
+}
+.stk-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 16px 0 12px;
+}
+.stk-name-row .field {
+  flex: 1 1 320px;
+  max-width: 520px;
+}
+.stock-row.stk-row {
+  grid-template-columns: minmax(0, 1fr) 140px;
+}

@@ -247,6 +247,27 @@ function oJ(e, t) {
     }
     e.stocktakes = (e.stocktakes || []).filter((x) => !(x.date === t.date && x.market === mk));
     e.stocktakes.push({ id: t.date + "|" + mk, date: t.date, market: mk, counts, at: a });
+  } else if (t.action === "stock-preset") {
+    // Saved stock preset (e.g. "Usual weekend"): add, or update one with the same id or name
+    let n = t.preset,
+      nm = n && typeof n.name == "string" ? n.name.trim() : "",
+      ps = (e.stockPresets ||= []);
+    if (!nm || nm.length > 60 || !n.counts || typeof n.counts != "object") throw Error("Enter a preset name, up to 60 characters.");
+    let counts = {};
+    for (let [pid, v] of Object.entries(n.counts)) {
+      if (!e.products.some((p) => p.id === pid)) continue;
+      if (!Number.isSafeInteger(v) || v < 0 || v > 1e6) throw Error("Stock counts must be whole numbers.");
+      counts[pid] = v;
+    }
+    // Update by id when given (allows renaming); otherwise a matching name updates that preset
+    let byId = n.id ? ps.find((x) => x.id === n.id) : null,
+      byName = ps.find((x) => x.name.toLowerCase() === nm.toLowerCase());
+    if (n.id && !byId) throw Error("This preset has been removed.");
+    if (byId && byName && byName !== byId) throw Error("Another preset already uses that name.");
+    let hit = byId || byName;
+    hit ? ((hit.name = nm), (hit.counts = counts), (hit.at = a)) : ps.push({ id: crypto.randomUUID(), name: nm, counts, at: a });
+  } else if (t.action === "delete-stock-preset") {
+    e.stockPresets = (e.stockPresets || []).filter((x) => x.id !== t.id);
   } else if (t.action === "delete-sales") {
     // Delete one day's sales for a market, or all sales. Today's stocktakes are kept.
     let today = lsDay(a),
@@ -620,6 +641,15 @@ var LsPencil = Pa("pencil", [
       },
     ],
     ["path", { d: "m15 5 4 4", key: "1mk7zo" }],
+  ]),
+  // lucide "clipboard-list" for the Stocktake tab
+  LsClipboard = Pa("clipboard-list", [
+    ["rect", { width: "8", height: "4", x: "8", y: "2", rx: "1", ry: "1", key: "tgr4d6" }],
+    ["path", { d: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2", key: "116196" }],
+    ["path", { d: "M12 11h4", key: "1jrz19" }],
+    ["path", { d: "M12 16h4", key: "n85exb" }],
+    ["path", { d: "M8 11h.01", key: "1dfujw" }],
+    ["path", { d: "M8 16h.01", key: "18s6g9" }],
   ]),
   LsMapPin = Pa("map-pin", [
     [
@@ -9073,6 +9103,18 @@ function m_({ offline: e = !1 } = {}) {
     // Inventory heading / subheading filters (same as the checkout)
     [invCat, setInvCat] = (0, wa.useState)("all"),
     [invSub, setInvSub] = (0, wa.useState)("all"),
+    // Stock presets dialog (save / manage)
+    [presetDlg, setPresetDlg] = (0, wa.useState)(!1),
+    [presetErr, setPresetErr] = (0, wa.useState)(""),
+    // Stocktake tab: build and save base stocktake presets
+    [stkSel, setStkSel] = (0, wa.useState)(""),
+    [stkName, setStkName] = (0, wa.useState)(""),
+    [stkDraft, setStkDraft] = (0, wa.useState)({}),
+    [stkBase, setStkBase] = (0, wa.useState)(""),
+    [stkMsg, setStkMsg] = (0, wa.useState)(""),
+    [stkQ, setStkQ] = (0, wa.useState)(""),
+    [stkCat, setStkCat] = (0, wa.useState)("all"),
+    [stkSub, setStkSub] = (0, wa.useState)("all"),
     [pwErr, setPwErr] = (0, wa.useState)(""),
     [selGrp, setSelGrp] = (0, wa.useState)(""),
     [pwDlg, setPwDlg] = (0, wa.useState)(!1),
@@ -9213,6 +9255,94 @@ function m_({ offline: e = !1 } = {}) {
       stKey !== stSavedKey &&
       (setStDraft(Object.fromEntries(Object.entries(stSaved).map(([k, v]) => [k, String(v)]))), setStKey(stSavedKey), setStMsg(""));
   }, [stSavedKey, r, stKey]);
+  let presets = t.stockPresets || [];
+  // Fill today's counts from a preset; they can be edited before saving
+  function loadPreset(P) {
+    (setStDraft(Object.fromEntries(Object.entries(P.counts).filter(([k]) => at.some((x) => x.id === k)).map(([k, v]) => [k, String(v)]))),
+      setStMsg("preset:" + P.name));
+  }
+  async function savePreset(G) {
+    G.preventDefault();
+    if (ut.current) return;
+    let nm = String(new FormData(G.currentTarget).get("presetName") || "").trim(),
+      counts = stCounts(stDraft);
+    if (!Object.values(counts).some((v) => v > 0)) return setPresetErr("Enter some stock counts first, then save them as a preset.");
+    ((ut.current = !0), s(!0), setPresetErr(""));
+    try {
+      (await ha({ action: "stock-preset", preset: { name: nm, counts } }), setPresetDlg(!1), setStMsg("presetSaved:" + nm));
+    } catch (st) {
+      setPresetErr(st.message);
+    } finally {
+      ((ut.current = !1), s(!1));
+    }
+  }
+  async function deletePreset(P) {
+    if (ut.current) return;
+    ((ut.current = !0), s(!0), setPresetErr(""));
+    try {
+      await ha({ action: "delete-stock-preset", id: P.id });
+    } catch (st) {
+      setPresetErr(st.message);
+    } finally {
+      ((ut.current = !1), s(!1));
+    }
+  }
+  // ----- Stocktake tab -----
+  let groupsOf = (list) =>
+      [
+        ...xt.flatMap((G) => [
+          { id: G.id, heading: G.name, subcategory: "", products: list.filter((Te) => Te.category_id === G.id) },
+          ...t.categories
+            .filter((Te) => Te.parent_id === G.id)
+            .map((Te) => ({ id: Te.id, heading: G.name, subcategory: Te.name, products: list.filter((st) => st.category_id === Te.id) })),
+        ]),
+        { id: "uncategorised", heading: "Uncategorised", subcategory: "", products: list.filter((G) => !G.category_id) },
+      ].filter((G) => G.products.length),
+    stkList = at.filter(
+      (G) =>
+        G.name.toLowerCase().includes(stkQ.trim().toLowerCase()) &&
+        (stkCat === "all" || G.category_id === stkCat || t.categories.some((Te) => Te.id === G.category_id && Te.parent_id === stkCat)) &&
+        (stkSub === "all" || G.category_id === stkSub),
+    ),
+    stkGroups = groupsOf(stkList),
+    stkPreset = presets.find((P) => P.id === stkSel) || null,
+    stkDirty =
+      !!stkSel &&
+      (stkSel === "new"
+        ? !!stkName.trim() || Object.keys(stCounts(stkDraft)).length > 0
+        : !!stkPreset && (stkName.trim() !== stkPreset.name || stCanon(stCounts(stkDraft)) !== stCanon(stkPreset.counts))),
+    savedDays = [...(t.stocktakes || [])]
+      .filter((x) => Object.values(x.counts || {}).some((v) => v > 0))
+      .sort((x, y) => (x.at < y.at ? 1 : -1));
+  // Open a preset for editing ("new" = blank, or copied counts)
+  function openPreset(id, counts, name) {
+    let P = presets.find((x) => x.id === id);
+    (setStkSel(id),
+      setStkName(name ?? (P ? P.name : "")),
+      setStkDraft(Object.fromEntries(Object.entries(counts ?? (P ? P.counts : {})).map(([k, v]) => [k, String(v)]))),
+      setStkMsg(""));
+  }
+  // Start from the first preset when the tab is opened
+  (0, wa.useEffect)(() => {
+    !stkSel && presets.length && openPreset(presets[0].id);
+  }, [stkSel, presets.length]);
+  async function saveStk() {
+    if (ut.current) return;
+    let nm = stkName.trim(),
+      counts = stCounts(stkDraft);
+    if (!nm) return setStkMsg("Give the preset a name first.");
+    if (!Object.values(counts).some((v) => v > 0)) return setStkMsg("Enter some counts before saving the preset.");
+    ((ut.current = !0), s(!0), setStkMsg(""));
+    try {
+      let G = await ha({ action: "stock-preset", preset: { id: stkSel !== "new" ? stkSel : void 0, name: nm, counts } }),
+        P = (G.stockPresets || []).find((x) => x.name.toLowerCase() === nm.toLowerCase());
+      (P && (setStkSel(P.id), setStkName(P.name)), setStkMsg("saved"));
+    } catch (st) {
+      setStkMsg(st.message);
+    } finally {
+      ((ut.current = !1), s(!1));
+    }
+  }
   async function saveStock() {
     if (ut.current || !ve) return;
     ((ut.current = !0), s(!0), setStMsg(""));
@@ -9529,7 +9659,9 @@ function m_({ offline: e = !1 } = {}) {
       ((ut.current = !0), s(!0), ue(""));
       try {
         let G = await ha(
-          Y.kind === "sales-day"
+          Y.kind === "preset"
+            ? { action: "delete-stock-preset", id: Y.item.id }
+            : Y.kind === "sales-day"
             ? { action: "delete-sales", date: Y.item.day, market: Y.item.market }
             : Y.kind === "sales-all"
               ? { action: "delete-sales", all: !0 }
@@ -9541,7 +9673,8 @@ function m_({ offline: e = !1 } = {}) {
                     id: Y.item.id,
                   },
         );
-        (Y.kind === "reset-sales" && (setSalesOk(!1), setEditOk(!1)), Y.kind.startsWith("sales") && setSelGrp(""));
+        (Y.kind === "preset" && setStkSel(""),
+          Y.kind === "reset-sales" && (setSalesOk(!1), setEditOk(!1)), Y.kind.startsWith("sales") && setSelGrp(""));
         Y.kind === "market" && Y.item.name === ve && pickMarket("");
         (Y.kind === "product" &&
           ((Gt.current = ""),
@@ -9563,6 +9696,8 @@ function m_({ offline: e = !1 } = {}) {
   let jr =
     Y?.kind === "product"
       ? "This removes the item from the checkout and the current basket."
+      : Y?.kind === "preset"
+        ? "This deletes the preset. Stocktakes already saved for past days are not affected."
       : Y?.kind === "market"
         ? "This removes the market from the list you choose from at the checkout."
         : Y?.kind === "sales-day"
@@ -9721,7 +9856,8 @@ function m_({ offline: e = !1 } = {}) {
         value: l,
         onValueChange: (G) => {
           // Leaving Inventory with unsaved counts saves them; leaving Sales locks it again
-          (l === "inventory" && stDirty && ve && saveStock(), l === "sales" && G !== "sales" && setSalesOk(!1), l === "editing" && G !== "editing" && setEditOk(!1), setPwErr(""), u(G));
+          (l === "inventory" && stDirty && ve && saveStock(),
+            l === "stocktake" && stkDirty && stkName.trim() && Object.values(stCounts(stkDraft)).some((v) => v > 0) && saveStk(), l === "sales" && G !== "sales" && setSalesOk(!1), l === "editing" && G !== "editing" && setEditOk(!1), setPwErr(""), u(G));
         },
         children: [
           (0, T.jsxs)(rE, {
@@ -9729,6 +9865,7 @@ function m_({ offline: e = !1 } = {}) {
             children: [
               (0, T.jsxs)(Pd, { value: "checkout", children: [(0, T.jsx)(zp, {}), "Checkout"] }),
               (0, T.jsxs)(Pd, { value: "inventory", children: [(0, T.jsx)(Du, {}), "Inventory"] }),
+              (0, T.jsxs)(Pd, { value: "stocktake", children: [(0, T.jsx)(LsClipboard, {}), "Stocktake"] }),
               (0, T.jsxs)(Pd, { value: "editing", children: [(0, T.jsx)(LsPencil, {}), "Editing"] }),
               (0, T.jsxs)(Pd, { value: "sales", children: [(0, T.jsx)(Hp, {}), "Sales"] }),
             ],
@@ -10045,6 +10182,40 @@ function m_({ offline: e = !1 } = {}) {
                           children:
                             "Enter how many of each item you have at the start of the day. Items left blank count as 0 and show No stock at the checkout.",
                         }),
+                        // Stock presets (made in the Stocktake tab): fill all counts in one tap, then adjust
+                        (0, T.jsxs)("div", {
+                          className: "preset-bar",
+                          children: [
+                            (0, T.jsxs)("div", {
+                              className: "preset-bar-text",
+                              children: [
+                                (0, T.jsx)("strong", { children: "Load a stocktake preset" }),
+                                (0, T.jsx)("span", {
+                                  children: presets.length
+                                    ? "Fills in today\u2019s counts from the preset. Then change any that are different and tap Save stocktake."
+                                    : "No presets yet. Create the usual weekly stocktake in the Stocktake tab.",
+                                }),
+                              ],
+                            }),
+                            (0, T.jsxs)("div", {
+                              className: "preset-buttons",
+                              children: [
+                                ...presets.map((P) =>
+                                  (0, T.jsxs)(
+                                    "button",
+                                    { className: "preset-load", disabled: A, onClick: () => loadPreset(P), children: ["Load ", (0, T.jsx)("strong", { children: P.name })] },
+                                    P.id,
+                                  ),
+                                ),
+                                (0, T.jsx)("button", {
+                                  className: "secondary",
+                                  onClick: () => (stDirty && saveStock(), u("stocktake")),
+                                  children: presets.length ? "Edit presets" : "Go to Stocktake",
+                                }),
+                              ],
+                            }),
+                          ],
+                        }),
                         (0, T.jsxs)("div", {
                           className: "search",
                           children: [
@@ -10200,11 +10371,16 @@ function m_({ offline: e = !1 } = {}) {
                           className: "stock-save-bar",
                           children: [
                             (0, T.jsx)("span", {
-                              className: "stock-save-status" + (stMsg && stMsg !== "saved" ? " error" : ""),
+                              className:
+                                "stock-save-status" + (stMsg && stMsg !== "saved" && !stMsg.startsWith("preset") ? " error" : ""),
                               children:
-                                stMsg && stMsg !== "saved"
-                                  ? stMsg
-                                  : stDirty
+                                stMsg.startsWith("preset:") && stDirty
+                                  ? "Loaded \u201c" + stMsg.slice(7) + "\u201d \u2014 check the counts, then Save stocktake"
+                                  : stMsg.startsWith("presetSaved:")
+                                    ? "Saved preset \u201c" + stMsg.slice(12) + "\u201d" + (stDirty ? " \u2014 today\u2019s stocktake not saved yet" : "")
+                                    : stMsg && stMsg !== "saved" && !stMsg.startsWith("preset")
+                                      ? stMsg
+                                      : stDirty
                                     ? "Unsaved changes"
                                     : stToday
                                       ? "Stocktake saved"
@@ -10215,6 +10391,296 @@ function m_({ offline: e = !1 } = {}) {
                               disabled: A || (!stDirty && !!stToday),
                               onClick: saveStock,
                               children: A ? "Saving…" : "Save stocktake",
+                            }),
+                          ],
+                        }),
+                      ],
+                    }),
+              ],
+            }),
+          }),
+          (0, T.jsx)(j0, {
+            value: "stocktake",
+            children: (0, T.jsxs)("section", {
+              className: "page inventory-page stocktake-page",
+              children: [
+                (0, T.jsx)("div", {
+                  className: "section-heading",
+                  children: (0, T.jsxs)("div", {
+                    children: [
+                      (0, T.jsx)("p", { className: "eyebrow", children: "BASE STOCKTAKE PRESETS" }),
+                      (0, T.jsx)("h1", { children: "Stocktake" }),
+                    ],
+                  }),
+                }),
+                (0, T.jsx)("div", {
+                  className: "notice",
+                  children:
+                    "Save the usual weekly stocktake here as a preset. Each market day, load it in the Inventory tab, then adjust the counts for that day.",
+                }),
+                // Preset chooser
+                (0, T.jsxs)("div", {
+                  className: "stk-presets",
+                  children: [
+                    (0, T.jsx)("p", { className: "sale-step", children: "Presets" }),
+                    (0, T.jsxs)("div", {
+                      className: "category-chips",
+                      children: [
+                        ...presets.map((P) =>
+                          (0, T.jsx)(
+                            "button",
+                            { "aria-pressed": stkSel === P.id, disabled: A, onClick: () => openPreset(P.id), children: P.name },
+                            P.id,
+                          ),
+                        ),
+                        (0, T.jsxs)("button", {
+                          "aria-pressed": stkSel === "new",
+                          className: "stk-new",
+                          disabled: A,
+                          onClick: () => openPreset("new", {}, presets.length ? "" : "Usual weekly stocktake"),
+                          children: [(0, T.jsx)(ts, { size: 16 }), "New preset"],
+                        }),
+                      ],
+                    }),
+                  ],
+                }),
+                // Copy from a day that was already counted (e.g. today's West End stocktake)
+                savedDays.length > 0 &&
+                  (0, T.jsxs)("details", {
+                    className: "stk-copy",
+                    open: !presets.length,
+                    children: [
+                      (0, T.jsx)("summary", { children: "Copy counts from a saved day’s stocktake" }),
+                      (0, T.jsx)("p", {
+                        className: "muted",
+                        children: presets.length
+                          ? "Copies that day’s starting counts into the preset below (or a new one), ready to check and save."
+                          : "Start your base preset from a stocktake you have already entered.",
+                      }),
+                      (0, T.jsx)("div", {
+                        className: "stk-copy-list",
+                        children: savedDays.slice(0, 12).map((x) =>
+                          (0, T.jsxs)(
+                            "button",
+                            {
+                              className: "secondary",
+                              disabled: A,
+                              onClick: () =>
+                                stkSel && stkSel !== ""
+                                  ? (setStkDraft(Object.fromEntries(Object.entries(x.counts).map(([k, v]) => [k, String(v)]))),
+                                    stkSel === "new" && !stkName.trim() && setStkName(x.market + " weekly stocktake"),
+                                    setStkMsg("copied:" + lsDayLabel(x.date) + " · " + x.market))
+                                  : (openPreset("new", x.counts, x.market + " weekly stocktake"), setStkMsg("copied:" + lsDayLabel(x.date) + " · " + x.market)),
+                              children: [
+                                (0, T.jsx)("strong", { children: x.market }),
+                                (0, T.jsxs)("span", {
+                                  children: [lsDayLabel(x.date), " · ", Object.values(x.counts).filter((v) => v > 0).length, " items"],
+                                }),
+                              ],
+                            },
+                            x.id,
+                          ),
+                        ),
+                      }),
+                    ],
+                  }),
+                !stkSel
+                  ? (0, T.jsxs)("div", {
+                      className: "welcome",
+                      children: [
+                        (0, T.jsx)(LsClipboard, { size: 40, style: { margin: "auto" } }),
+                        (0, T.jsx)("h2", { children: "No presets yet" }),
+                        (0, T.jsx)("p", {
+                          children: savedDays.length
+                            ? "Copy a saved day’s stocktake above, or start a new blank preset."
+                            : "Start a new preset and enter the usual stock for a market day.",
+                        }),
+                        (0, T.jsxs)("button", {
+                          className: "primary",
+                          onClick: () => openPreset("new", {}, "Usual weekly stocktake"),
+                          children: [(0, T.jsx)(ts, {}), "New preset"],
+                        }),
+                      ],
+                    })
+                  : (0, T.jsxs)(T.Fragment, {
+                      children: [
+                        (0, T.jsxs)("div", {
+                          className: "stk-name-row",
+                          children: [
+                            (0, T.jsxs)("label", {
+                              className: "field",
+                              children: [
+                                "Preset name",
+                                (0, T.jsx)("input", {
+                                  value: stkName,
+                                  maxLength: 60,
+                                  autoComplete: "off",
+                                  placeholder: "e.g. Usual weekly stocktake",
+                                  onChange: (G) => (setStkName(G.target.value), setStkMsg("")),
+                                }),
+                              ],
+                            }),
+                            stkSel !== "new" &&
+                              stkPreset &&
+                              (0, T.jsxs)("button", {
+                                className: "danger-outline",
+                                disabled: A,
+                                onClick: () => Gr({ kind: "preset", item: { id: stkPreset.id, name: stkPreset.name } }),
+                                children: [(0, T.jsx)(yd, {}), "Delete preset"],
+                              }),
+                          ],
+                        }),
+                        (0, T.jsxs)("div", {
+                          className: "search",
+                          children: [
+                            (0, T.jsx)(E0, { size: 20 }),
+                            (0, T.jsx)("input", {
+                              placeholder: "Find an item…",
+                              value: stkQ,
+                              onChange: (G) => setStkQ(G.target.value),
+                              "aria-label": "Find an item in the preset",
+                            }),
+                          ],
+                        }),
+                        xt.length > 0 &&
+                          (0, T.jsxs)("div", {
+                            className: "category-browser inventory-browser",
+                            children: [
+                              (0, T.jsxs)("div", {
+                                className: "category-chips",
+                                children: [
+                                  (0, T.jsx)("button", {
+                                    "aria-pressed": stkCat === "all",
+                                    onClick: () => (setStkCat("all"), setStkSub("all")),
+                                    children: "All items",
+                                  }),
+                                  xt.map((G) =>
+                                    (0, T.jsx)(
+                                      "button",
+                                      { "aria-pressed": stkCat === G.id, onClick: () => (setStkCat(G.id), setStkSub("all")), children: G.name },
+                                      G.id,
+                                    ),
+                                  ),
+                                ],
+                              }),
+                              stkCat !== "all" &&
+                                t.categories.some((G) => G.parent_id === stkCat) &&
+                                (0, T.jsxs)("div", {
+                                  className: "category-chips subcategory-chips",
+                                  children: [
+                                    (0, T.jsxs)("button", {
+                                      "aria-pressed": stkSub === "all",
+                                      onClick: () => setStkSub("all"),
+                                      children: ["All ", t.categories.find((G) => G.id === stkCat)?.name],
+                                    }),
+                                    t.categories
+                                      .filter((G) => G.parent_id === stkCat)
+                                      .map((G) =>
+                                        (0, T.jsx)(
+                                          "button",
+                                          { "aria-pressed": stkSub === G.id, onClick: () => setStkSub(G.id), children: G.name },
+                                          G.id,
+                                        ),
+                                      ),
+                                  ],
+                                }),
+                            ],
+                          }),
+                        at.length
+                          ? stkGroups.length
+                            ? (0, T.jsx)("div", {
+                                className: "stock-list",
+                                children: stkGroups.map((g, gi) =>
+                                  (0, T.jsxs)(
+                                    "section",
+                                    {
+                                      className: "stock-group",
+                                      children: [
+                                        (gi === 0 || stkGroups[gi - 1].heading !== g.heading) && (0, T.jsx)("h2", { children: g.heading }),
+                                        g.subcategory && (0, T.jsx)("h3", { className: "subcategory-heading", children: g.subcategory }),
+                                        (0, T.jsxs)("div", {
+                                          className: "stock-table",
+                                          children: [
+                                            (0, T.jsxs)("div", {
+                                              className: "stock-row stk-row stock-head",
+                                              children: [(0, T.jsx)("span", { children: "Item" }), (0, T.jsx)("span", { children: "Usual count" })],
+                                            }),
+                                            g.products.map((P) =>
+                                              (0, T.jsxs)(
+                                                "div",
+                                                {
+                                                  className: "stock-row stk-row",
+                                                  children: [
+                                                    (0, T.jsxs)("span", {
+                                                      className: "stock-name",
+                                                      children: [(0, T.jsx)("strong", { children: P.name }), (0, T.jsx)("small", { children: ln(P.price) })],
+                                                    }),
+                                                    (0, T.jsx)("span", {
+                                                      children: (0, T.jsx)("input", {
+                                                        type: "number",
+                                                        inputMode: "numeric",
+                                                        min: "0",
+                                                        step: "1",
+                                                        placeholder: "0",
+                                                        "aria-label": "Preset count for " + P.name,
+                                                        value: stkDraft[P.id] ?? "",
+                                                        onChange: (G) => {
+                                                          let v = G.target.value;
+                                                          (setStkDraft((d) => ({ ...d, [P.id]: v })), setStkMsg(""));
+                                                        },
+                                                      }),
+                                                    }),
+                                                  ],
+                                                },
+                                                P.id,
+                                              ),
+                                            ),
+                                          ],
+                                        }),
+                                      ],
+                                    },
+                                    g.id,
+                                  ),
+                                ),
+                              })
+                            : (0, T.jsxs)("div", {
+                                className: "welcome",
+                                children: [
+                                  (0, T.jsx)("h2", { children: "No items match" }),
+                                  (0, T.jsx)("button", {
+                                    className: "text-button",
+                                    onClick: () => (setStkQ(""), setStkCat("all"), setStkSub("all")),
+                                    children: "Show all items",
+                                  }),
+                                ],
+                              })
+                          : (0, T.jsxs)("div", {
+                              className: "welcome",
+                              children: [(0, T.jsx)("h2", { children: "No items yet" }), (0, T.jsx)("p", { children: "Add items in the Editing tab first." })],
+                            }),
+                        (0, T.jsxs)("div", {
+                          className: "stock-save-bar",
+                          children: [
+                            (0, T.jsx)("span", {
+                              className:
+                                "stock-save-status" + (stkMsg && stkMsg !== "saved" && !stkMsg.startsWith("copied:") ? " error" : ""),
+                              children: stkMsg.startsWith("copied:")
+                                ? "Copied counts from " + stkMsg.slice(7) + " — check them, then Save preset"
+                                : stkMsg && stkMsg !== "saved"
+                                  ? stkMsg
+                                  : stkDirty
+                                    ? "Unsaved changes"
+                                    : stkMsg === "saved"
+                                      ? "Preset saved"
+                                      : stkPreset
+                                        ? Object.values(stkPreset.counts).filter((v) => v > 0).length + " items in this preset"
+                                        : "New preset",
+                            }),
+                            (0, T.jsx)("button", {
+                              className: "primary",
+                              disabled: A || !stkDirty,
+                              onClick: saveStk,
+                              children: A ? "Saving…" : "Save preset",
                             }),
                           ],
                         }),
@@ -11076,6 +11542,8 @@ function m_({ offline: e = !1 } = {}) {
                     : "Delete " +
                       (Y?.kind === "product"
                         ? "item"
+                        : Y?.kind === "preset"
+                          ? "preset"
                         : Y?.kind === "market"
                           ? "market"
                           : Y?.kind === "sales-day"
