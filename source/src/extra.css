@@ -631,3 +631,97 @@
   margin-left: auto;
   flex: 0 0 auto;
 }
+
+/* ---------- Round 10: last 3 sales ---------- */
+.catalog .section-heading {
+  align-items: flex-start;
+}
+.recent-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.recent-list {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 4px;
+}
+.recent-sale {
+  border: 1px solid #dce5df;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+.recent-sale.open {
+  border-color: #126448;
+}
+.recent-head {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  min-height: 60px;
+  text-align: left;
+  background: transparent;
+}
+.recent-when,
+.recent-meta {
+  display: grid;
+  gap: 2px;
+}
+.recent-when small,
+.recent-meta small {
+  color: #6b7b71;
+  font-size: 12px;
+}
+.recent-meta {
+  font-size: 14px;
+  color: #3b5043;
+}
+.recent-total {
+  font-size: 17px;
+}
+.recent-body {
+  padding: 4px 14px 14px;
+  border-top: 1px solid #edf2ef;
+  display: grid;
+  gap: 4px;
+}
+.recent-body .line-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 14px;
+}
+.recent-sum {
+  border-top: 1px solid #edf2ef;
+  margin-top: 4px;
+  padding-top: 8px !important;
+  font-size: 15px !important;
+}
+.recent-delete {
+  justify-self: start;
+  margin-top: 8px;
+}
+.recent-confirm {
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #fbefef;
+  border: 1px solid #f0c9cb;
+}
+.recent-confirm p {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: #6e2328;
+}
+.recent-confirm .danger-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}

@@ -176,7 +176,7 @@ function oJ(e, t) {
   } else if (t.action === "sale") {
     // Sale: cash (automatic 5% off, rounded to 5c) or card (optional staff 20% / stallholder 10%)
     let mk = typeof t.market == "string" ? t.market.trim() : "",
-      dtype = t.method === "card" && (t.discount === "staff20" || t.discount === "stall10") ? t.discount : null,
+      dtype = t.discount === "staff20" || t.discount === "stall10" ? t.discount : null,
       isCustom = t.discount === "custom",
       cust = isCustom && t.custom && typeof t.custom == "object" ? t.custom : {},
       nm = typeof t.staffName == "string" ? t.staffName.trim() : "";
@@ -188,7 +188,7 @@ function oJ(e, t) {
       !Array.isArray(t.lines) ||
       !t.lines.length ||
       t.lines.length > 200 ||
-      (t.discount != null && t.method === "card" && !dtype && !isCustom) ||
+      (t.discount != null && !dtype && !isCustom) ||
       (dtype && (!nm || nm.length > 60))
     )
       throw Error("Check the payment details and staff name.");
@@ -245,6 +245,11 @@ function oJ(e, t) {
       lines: i,
     };
     e.sales.unshift(r);
+  } else if (t.action === "delete-recent-sale") {
+    // Staff can delete one of the 3 most recent sales (no editing). Its items go back into the day's stock.
+    let recent = [...e.sales].sort((x, y) => (x.at < y.at ? 1 : -1)).slice(0, 3);
+    if (!recent.some((x) => x.id === t.id)) throw Error("Only the last 3 sales can be deleted here.");
+    e.sales = e.sales.filter((x) => x.id !== t.id);
   } else if (t.action === "stocktake") {
     // Morning stocktake for one day + market
     let mk = typeof t.market == "string" ? t.market.trim() : "";
@@ -8802,11 +8807,12 @@ var lsDiscountLabel = (s) => {
   return base && cu ? base + " + custom" : base || (cu ? "Custom discount" : "None");
 };
 var lsIsDiscounted = (s) => !!s.discount_type || lsCustomOff(s) > 0;
-// Price a basket.
-// custom = total dollars-off from per-item custom discounts (cents). It comes off first.
-// Cash: then 5% off, then round to nearest 5c. Card: then optional staff 20% / stallholder 10% (not with custom).
+// Price a basket (cash or card, same options).
+// custom = total dollars-off from per-item custom discounts (cents).
+// Optional staff 20% / stallholder 10% (instead of custom). Cash is then rounded to the nearest 5c.
+// (The automatic 5% cash discount was removed on 29 Oct 2026; older sales keep their "cash5" record.)
 function lsPrice(subtotal, method, dtype, custom = 0) {
-  let type = method === "cash" ? "cash5" : method === "card" && (dtype === "staff20" || dtype === "stall10") ? dtype : null,
+  let type = dtype === "staff20" || dtype === "stall10" ? dtype : null,
     pct = type ? LS_DISCOUNTS[type].pct : 0,
     base = Math.max(0, subtotal - custom),
     pctOff = Math.round((base * pct) / 100),
@@ -9151,6 +9157,11 @@ function m_({ offline: e = !1 } = {}) {
     [dName, setDName] = (0, wa.useState)(""),
     // Custom discount: dollars off each item, typed per basket line { productId: "1.50" }
     [cust, setCust] = (0, wa.useState)({}),
+    // Checkout: review / delete the last 3 sales (no password, no editing)
+    [recentOpen, setRecentOpen] = (0, wa.useState)(!1),
+    [recentView, setRecentView] = (0, wa.useState)(""),
+    [recentDel, setRecentDel] = (0, wa.useState)(""),
+    [recentErr, setRecentErr] = (0, wa.useState)(""),
     // Inventory (morning stocktake)
     [invQ, setInvQ] = (0, wa.useState)(""),
     [stDraft, setStDraft] = (0, wa.useState)({}),
@@ -9358,6 +9369,19 @@ function m_({ offline: e = !1 } = {}) {
       await ha({ action: "delete-stock-preset", id: P.id });
     } catch (st) {
       setPresetErr(st.message);
+    } finally {
+      ((ut.current = !1), s(!1));
+    }
+  }
+  // ----- Last 3 sales (Checkout) -----
+  let recent3 = [...t.sales].sort((x, y) => (x.at < y.at ? 1 : -1)).slice(0, 3);
+  async function deleteRecent(id) {
+    if (ut.current) return;
+    ((ut.current = !0), s(!0), setRecentErr(""));
+    try {
+      (await ha({ action: "delete-recent-sale", id }), setRecentDel(""), setRecentView(""));
+    } catch (G) {
+      setRecentErr(G.message);
     } finally {
       ((ut.current = !1), s(!1));
     }
@@ -9737,8 +9761,8 @@ function m_({ offline: e = !1 } = {}) {
           id: Gt.current,
           cash: 0,
           method: vt,
-          discount: dsc === "custom" ? "custom" : vt === "card" && dsc !== "none" ? dsc : null,
-          staffName: vt === "card" && (dsc === "staff20" || dsc === "stall10") ? dName.trim() : "",
+          discount: dsc === "custom" ? "custom" : dsc !== "none" ? dsc : null,
+          staffName: dsc === "staff20" || dsc === "stall10" ? dName.trim() : "",
           custom:
             dsc === "custom" ? Object.fromEntries(dt.map((G) => [G.id, custEach(G)]).filter(([, v]) => v > 0)) : void 0,
           market: ve,
@@ -10007,6 +10031,12 @@ function m_({ offline: e = !1 } = {}) {
                             (0, T.jsx)("p", { className: "eyebrow", children: "THE SHOP COUNTER" }),
                             (0, T.jsx)("h1", { children: "Let\u2019s make a sale." }),
                           ],
+                        }),
+                        (0, T.jsxs)("button", {
+                          className: "secondary recent-btn",
+                          disabled: !r,
+                          onClick: () => (setRecentView(""), setRecentDel(""), setRecentErr(""), setRecentOpen(!0)),
+                          children: [(0, T.jsx)(Hp, {}), "Last 3 sales"],
                         }),
                       ],
                     }),
@@ -11846,6 +11876,145 @@ function m_({ offline: e = !1 } = {}) {
           ],
         }),
       }),
+      // Last 3 sales: view and delete (no editing)
+      (0, T.jsx)(Md, {
+        open: recentOpen,
+        onOpenChange: (G) => !G && !A && setRecentOpen(!1),
+        children: (0, T.jsxs)(Hd, {
+          className: "dialog-box recent-box",
+          children: [
+            (0, T.jsx)(qd, { children: "Last 3 sales" }),
+            (0, T.jsx)(zd, { children: "Tap a sale to see it. A sale entered by mistake can be deleted; sales can’t be changed." }),
+            recent3.length
+              ? (0, T.jsx)("div", {
+                  className: "recent-list",
+                  children: recent3.map((x) => {
+                    let open = recentView === x.id,
+                      items = x.lines.reduce((a2, l2) => a2 + l2.qty, 0);
+                    return (0, T.jsxs)(
+                      "div",
+                      {
+                        className: "recent-sale" + (open ? " open" : ""),
+                        children: [
+                          (0, T.jsxs)("button", {
+                            type: "button",
+                            className: "recent-head",
+                            "aria-expanded": open,
+                            onClick: () => (setRecentView(open ? "" : x.id), setRecentDel(""), setRecentErr("")),
+                            children: [
+                              (0, T.jsxs)("span", {
+                                className: "recent-when",
+                                children: [
+                                  (0, T.jsx)("strong", { children: lsTime(x.at) }),
+                                  (0, T.jsx)("small", { children: lsDayLabel(lsSaleDay(x)) + " · " + x.market }),
+                                ],
+                              }),
+                              (0, T.jsxs)("span", {
+                                className: "recent-meta",
+                                children: [
+                                  items + (items === 1 ? " item" : " items") + " · " + lsMethod(x.method),
+                                  lsIsDiscounted(x) ? (0, T.jsx)("small", { children: lsDiscountLabel(x) }) : null,
+                                ],
+                              }),
+                              (0, T.jsx)("strong", { className: "recent-total", children: ln(x.total) }),
+                            ],
+                          }),
+                          open &&
+                            (0, T.jsxs)("div", {
+                              className: "recent-body",
+                              children: [
+                                x.lines.map((G) =>
+                                  (0, T.jsxs)(
+                                    "div",
+                                    {
+                                      className: "line-title",
+                                      children: [
+                                        (0, T.jsxs)("span", {
+                                          children: [
+                                            G.qty,
+                                            " × ",
+                                            G.name,
+                                            (G.discount_each || 0) > 0
+                                              ? (0, T.jsx)("small", { className: "muted", children: "  (−" + ln(G.discount_each) + " each)" })
+                                              : null,
+                                          ],
+                                        }),
+                                        (0, T.jsx)("span", { children: ln(G.total) }),
+                                      ],
+                                    },
+                                    G.id,
+                                  ),
+                                ),
+                                lsCustomOff(x) > 0 &&
+                                  (0, T.jsxs)("div", {
+                                    className: "line-title muted",
+                                    children: [(0, T.jsx)("span", { children: "Custom discount" }), (0, T.jsx)("span", { children: "−" + ln(lsCustomOff(x)) })],
+                                  }),
+                                lsPctOff(x) > 0 &&
+                                  (0, T.jsxs)("div", {
+                                    className: "line-title muted",
+                                    children: [
+                                      (0, T.jsx)("span", {
+                                        children: (LS_DISCOUNTS[x.discount_type]?.label || "Discount") + (x.staff_name ? " · " + x.staff_name : ""),
+                                      }),
+                                      (0, T.jsx)("span", { children: "−" + ln(lsPctOff(x)) }),
+                                    ],
+                                  }),
+                                !!x.rounding &&
+                                  (0, T.jsxs)("div", {
+                                    className: "line-title muted",
+                                    children: [(0, T.jsx)("span", { children: "Cash rounding" }), (0, T.jsx)("span", { children: ln(x.rounding) })],
+                                  }),
+                                (0, T.jsxs)("div", {
+                                  className: "line-title recent-sum",
+                                  children: [(0, T.jsx)("span", { children: "Total" }), (0, T.jsx)("strong", { children: ln(x.total) })],
+                                }),
+                                recentDel === x.id
+                                  ? (0, T.jsxs)("div", {
+                                      className: "recent-confirm",
+                                      children: [
+                                        (0, T.jsx)("p", {
+                                          children: "Delete this sale? It will be removed from the sales records and its items go back into today’s stock. This can’t be undone.",
+                                        }),
+                                        (0, T.jsxs)("div", {
+                                          className: "row-actions",
+                                          children: [
+                                            (0, T.jsx)("button", { type: "button", className: "secondary", disabled: A, onClick: () => setRecentDel(""), children: "Keep it" }),
+                                            (0, T.jsxs)("button", {
+                                              type: "button",
+                                              className: "danger-button",
+                                              disabled: A,
+                                              onClick: () => deleteRecent(x.id),
+                                              children: [(0, T.jsx)(yd, {}), A ? "Deleting…" : "Yes, delete sale"],
+                                            }),
+                                          ],
+                                        }),
+                                      ],
+                                    })
+                                  : (0, T.jsxs)("button", {
+                                      type: "button",
+                                      className: "danger-outline recent-delete",
+                                      disabled: A,
+                                      onClick: () => (setRecentDel(x.id), setRecentErr("")),
+                                      children: [(0, T.jsx)(yd, {}), "Delete this sale"],
+                                    }),
+                              ],
+                            }),
+                        ],
+                      },
+                      x.id,
+                    );
+                  }),
+                })
+              : (0, T.jsx)("p", { className: "muted", style: { margin: "12px 0" }, children: "No sales yet." }),
+            recentErr && (0, T.jsx)("p", { role: "alert", className: "form-error", children: recentErr }),
+            (0, T.jsx)("div", {
+              className: "dialog-actions",
+              children: (0, T.jsx)("button", { type: "button", className: "secondary", onClick: () => setRecentOpen(!1), children: "Close" }),
+            }),
+          ],
+        }),
+      }),
       // Change the Sales password
       (0, T.jsx)(Md, {
         open: pwDlg,
@@ -11891,7 +12060,7 @@ function m_({ offline: e = !1 } = {}) {
               // Only a tap chooses the payment type (focus alone must not pick Cash)
               activationMode: "manual",
               onValueChange: (G) => {
-                A || (lt(G), ee(""), G === "cash" && dsc !== "custom" && (setDsc("none"), setDName("")));
+                A || (lt(G), ee(""));
               },
               children: (0, T.jsxs)(rE, {
                 className: "payment-methods",
@@ -11902,25 +12071,19 @@ function m_({ offline: e = !1 } = {}) {
               }),
             }),
             vt === "" && (0, T.jsx)("p", { className: "muted", children: "Choose cash or card to continue." }),
-            // Step 2: sale options (cash: 5% automatic, or custom + 5%; card: none / staff / stallholder / custom)
+            // Step 2: sale options (same for cash and card)
             vt !== "" &&
               (0, T.jsxs)(T.Fragment, {
                 children: [
                   (0, T.jsx)("p", { className: "sale-step", children: "2. Sale option" }),
                   (0, T.jsx)("div", {
                     className: "category-chips sale-options",
-                    children: (vt === "cash"
-                      ? [
-                          ["none", "Cash 5% (automatic)"],
-                          ["custom", "Custom discount"],
-                        ]
-                      : [
-                          ["none", "No discount"],
-                          ["staff20", "Staff 20%"],
-                          ["stall10", "Stallholder 10%"],
-                          ["custom", "Custom discount"],
-                        ]
-                    ).map(([k, lbl]) =>
+                    children: [
+                      ["none", "No discount"],
+                      ["staff20", "Staff 20%"],
+                      ["stall10", "Stallholder 10%"],
+                      ["custom", "Custom discount"],
+                    ].map(([k, lbl]) =>
                       (0, T.jsx)(
                         "button",
                         { type: "button", "aria-pressed": dsc === k, disabled: A, onClick: () => (setDsc(k), ee("")), children: lbl },
@@ -11928,8 +12091,7 @@ function m_({ offline: e = !1 } = {}) {
                       ),
                     ),
                   }),
-                  vt === "card" &&
-                    (dsc === "staff20" || dsc === "stall10") &&
+                  (dsc === "staff20" || dsc === "stall10") &&
                     (0, T.jsxs)("label", {
                       className: "field",
                       children: [
@@ -11950,10 +12112,7 @@ function m_({ offline: e = !1 } = {}) {
                       children: [
                         (0, T.jsx)("p", {
                           className: "muted custom-help",
-                          children:
-                            vt === "cash"
-                              ? "Type the amount off each item that gets a discount. The 5% cash discount is then taken off the new total."
-                              : "Type the amount off each item that gets a discount. Leave the others blank.",
+                          children: "Type the amount off each item that gets a discount. Leave the others blank.",
                         }),
                         dt.map((G) => {
                           let raw = String(cust[G.id] ?? ""),
@@ -12023,7 +12182,7 @@ function m_({ offline: e = !1 } = {}) {
                     (0, T.jsxs)("div", {
                       className: "discount-row",
                       children: [
-                        (0, T.jsx)("span", { children: LS_DISCOUNTS[pr.type].label + (vt === "cash" ? " (automatic)" : "") }),
+                        (0, T.jsx)("span", { children: LS_DISCOUNTS[pr.type].label + (dName.trim() ? " \u00b7 " + dName.trim() : "") }),
                         (0, T.jsx)("span", { children: "\u2212" + ln(pr.pctOff) }),
                       ],
                     }),
@@ -12111,7 +12270,7 @@ function m_({ offline: e = !1 } = {}) {
                 disabled:
                   A ||
                   da ||
-                  (vt === "card" && (dsc === "staff20" || dsc === "stall10") && !dName.trim()) ||
+                  ((dsc === "staff20" || dsc === "stall10") && !dName.trim()) ||
                   (dsc === "custom" && (custBad || custTotal <= 0)),
                 onClick: Ln,
                 children: A
@@ -12120,11 +12279,11 @@ function m_({ offline: e = !1 } = {}) {
                     ? "A discount is more than the item\u2019s price"
                     : dsc === "custom" && custTotal <= 0
                       ? "Enter an amount off for at least one item"
-                      : vt === "card"
-                        ? (dsc === "staff20" || dsc === "stall10") && !dName.trim()
-                          ? "Enter the staff name to continue"
-                          : "Card payment received \u2014 complete sale"
-                        : "Complete cash sale",
+                      : (dsc === "staff20" || dsc === "stall10") && !dName.trim()
+                        ? "Enter the staff name to continue"
+                        : vt === "card"
+                          ? "Card payment received \u2014 complete sale"
+                          : "Complete cash sale",
               }),
           ],
         }),
