@@ -9160,6 +9160,9 @@ function m_({ offline: e = !1 } = {}) {
     [salesOk, setSalesOk] = (0, wa.useState)(!1),
     // Editing tab uses the same password as Sales
     [editOk, setEditOk] = (0, wa.useState)(!1),
+    // Inventory and Stocktake use the same password too
+    [invOk, setInvOk] = (0, wa.useState)(!1),
+    [stkOk, setStkOk] = (0, wa.useState)(!1),
     // Inventory heading / subheading filters (same as the checkout)
     [invCat, setInvCat] = (0, wa.useState)("all"),
     [invSub, setInvSub] = (0, wa.useState)("all"),
@@ -9429,7 +9432,8 @@ function m_({ offline: e = !1 } = {}) {
   // ----- Sales tab: password -----
   async function unlockSales(G, where = "sales") {
     G.preventDefault();
-    let open = () => (where === "editing" ? setEditOk(!0) : setSalesOk(!0));
+    let open = () =>
+      where === "editing" ? setEditOk(!0) : where === "inventory" ? setInvOk(!0) : where === "stocktake" ? setStkOk(!0) : setSalesOk(!0);
     setPwErr("");
     let f = new FormData(G.currentTarget),
       pw = String(f.get("pw") || "");
@@ -9473,7 +9477,7 @@ function m_({ offline: e = !1 } = {}) {
   }
   // Password screen shared by Editing and Sales (one password for both)
   function lockForm(where) {
-    let name = where === "editing" ? "Editing" : "Sales";
+    let name = { editing: "Editing", inventory: "Inventory", stocktake: "Stocktake" }[where] || "Sales";
     return (0, T.jsxs)(
       "form",
       {
@@ -9486,8 +9490,12 @@ function m_({ offline: e = !1 } = {}) {
             children: t.salesPw
               ? name === "Editing"
                 ? "Changing items, headings and markets is protected."
+                : name === "Inventory"
+                ? "The day\u2019s stock counts are protected."
+                : name === "Stocktake"
+                ? "The stocktake presets are protected."
                 : "Sales records are protected."
-              : "One password protects both Editing and Sales. You will need it each time you open them.",
+              : "One password protects Inventory, Stocktake, Editing and Sales. You will need it each time you open them.",
           }),
           (0, T.jsxs)("label", {
             className: "field",
@@ -9515,6 +9523,41 @@ function m_({ offline: e = !1 } = {}) {
       "lock-" + where,
     );
   }
+  // Heading for a locked tab: title, plus Change password / Lock when open
+  let lockedHead = (key, eyebrow, title, sub, isOpen, lock) =>
+    (0, T.jsxs)(
+      "div",
+      {
+        className: "section-heading locked-head",
+        children: [
+          (0, T.jsxs)("div", {
+            children: [
+              (0, T.jsx)("p", { className: "eyebrow", children: eyebrow }),
+              (0, T.jsx)("h1", { children: title }),
+              sub,
+            ],
+          }),
+          isOpen &&
+            (0, T.jsxs)("div", {
+              className: "row-actions",
+              children: [
+                (0, T.jsx)("button", { className: "secondary", onClick: () => (setPwErr(""), setPwDlg(!0)), children: "Change password" }),
+                (0, T.jsx)("button", { className: "secondary", onClick: lock, children: "Lock" }),
+              ],
+            }),
+        ],
+      },
+      key,
+    );
+  let invHead = lockedHead(
+      "inv-head",
+      "MORNING STOCKTAKE",
+      "Inventory",
+      ve && (0, T.jsxs)("p", { className: "stock-day", children: [lsDayLabel(today), " \xB7 ", ve] }),
+      invOk,
+      () => (stDirty && ve && saveStock(), setInvOk(!1)),
+    ),
+    stkHead = lockedHead("stk-head", "BASE STOCKTAKE PRESETS", "Stocktake", null, stkOk, () => setStkOk(!1));
   let editHead = (0, T.jsxs)(
     "div",
     {
@@ -9748,7 +9791,7 @@ function m_({ offline: e = !1 } = {}) {
                   },
         );
         (Y.kind === "preset" && setStkSel(""),
-          Y.kind === "reset-sales" && (setSalesOk(!1), setEditOk(!1)), Y.kind.startsWith("sales") && setSelGrp(""));
+          Y.kind === "reset-sales" && (setSalesOk(!1), setEditOk(!1), setInvOk(!1), setStkOk(!1)), Y.kind.startsWith("sales") && setSelGrp(""));
         Y.kind === "market" && Y.item.name === ve && pickMarket("");
         (Y.kind === "product" &&
           ((Gt.current = ""),
@@ -9779,7 +9822,7 @@ function m_({ offline: e = !1 } = {}) {
           : Y?.kind === "sales-all"
             ? "This permanently deletes every sale recorded in the app. Download any sheets you need first."
             : Y?.kind === "reset-sales"
-              ? "Without the password, the only way back into Editing and Sales is to delete every sales record. Items, headings, markets and today’s stocktake are kept. You will then create a new password."
+              ? "Without the password, the only way back into the locked tabs is to delete every sales record. Items, headings, markets and today’s stocktake are kept. You will then create a new password."
         : Y?.kind === "category" && Y.item.parent_id
           ? `Items in this subheading will move to ${t.categories.find((G) => G.id === Y.item.parent_id)?.name || "the main heading"}.`
           : "This also removes its subheadings. Its items stay, listed as Uncategorised.";
@@ -9931,7 +9974,11 @@ function m_({ offline: e = !1 } = {}) {
         onValueChange: (G) => {
           // Leaving Inventory with unsaved counts saves them; leaving Sales locks it again
           (l === "inventory" && stDirty && ve && saveStock(),
-            l === "stocktake" && stkDirty && stkName.trim() && Object.values(stCounts(stkDraft)).some((v) => v > 0) && saveStk(), l === "sales" && G !== "sales" && setSalesOk(!1), l === "editing" && G !== "editing" && setEditOk(!1), setPwErr(""), u(G));
+            l === "stocktake" && stkDirty && stkName.trim() && Object.values(stCounts(stkDraft)).some((v) => v > 0) && saveStk(), l === "sales" && G !== "sales" && setSalesOk(!1), l === "editing" && G !== "editing" && setEditOk(!1),
+            l === "inventory" && G !== "inventory" && setInvOk(!1),
+            l === "stocktake" && G !== "stocktake" && setStkOk(!1),
+            setPwErr(""),
+            u(G));
         },
         children: [
           (0, T.jsxs)(rE, {
@@ -10228,17 +10275,11 @@ function m_({ offline: e = !1 } = {}) {
             value: "inventory",
             children: (0, T.jsxs)("section", {
               className: "page inventory-page",
-              children: [
-                (0, T.jsx)("div", {
-                  className: "section-heading",
-                  children: (0, T.jsxs)("div", {
-                    children: [
-                      (0, T.jsx)("p", { className: "eyebrow", children: "MORNING STOCKTAKE" }),
-                      (0, T.jsx)("h1", { children: "Inventory" }),
-                      ve && (0, T.jsxs)("p", { className: "stock-day", children: [lsDayLabel(today), " \xB7 ", ve] }),
-                    ],
-                  }),
-                }),
+              // Locked: heading + password screen only
+              children: !invOk
+                ? [invHead, lockForm("inventory")]
+                : [
+                invHead,
                 !ve
                   ? (0, T.jsxs)("div", {
                       className: "welcome",
@@ -10477,16 +10518,10 @@ function m_({ offline: e = !1 } = {}) {
             value: "stocktake",
             children: (0, T.jsxs)("section", {
               className: "page inventory-page stocktake-page",
-              children: [
-                (0, T.jsx)("div", {
-                  className: "section-heading",
-                  children: (0, T.jsxs)("div", {
-                    children: [
-                      (0, T.jsx)("p", { className: "eyebrow", children: "BASE STOCKTAKE PRESETS" }),
-                      (0, T.jsx)("h1", { children: "Stocktake" }),
-                    ],
-                  }),
-                }),
+              children: !stkOk
+                ? [stkHead, lockForm("stocktake")]
+                : [
+                stkHead,
                 (0, T.jsx)("div", {
                   className: "notice",
                   children:
@@ -11819,7 +11854,7 @@ function m_({ offline: e = !1 } = {}) {
           className: "dialog-box",
           children: [
             (0, T.jsx)(qd, { children: "Change the password" }),
-            (0, T.jsx)(zd, { children: "This password opens both Editing and Sales. Enter the current password, then the new one twice." }),
+            (0, T.jsx)(zd, { children: "This password opens Inventory, Stocktake, Editing and Sales. Enter the current password, then the new one twice." }),
             (0, T.jsxs)("form", {
               onSubmit: changePw,
               children: [

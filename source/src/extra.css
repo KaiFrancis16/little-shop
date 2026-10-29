@@ -627,3 +627,7 @@
 .custom-line.bad {
   color: #a12f35;
 }
+.locked-head > .row-actions {
+  margin-left: auto;
+  flex: 0 0 auto;
+}

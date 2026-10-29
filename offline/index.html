@@ -9044,6 +9044,10 @@ header {
 .custom-line.bad {
   color: #a12f35;
 }
+.locked-head > .row-actions {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
 
 </style></head><body><p id="install-status" role="status" class="sr-only">Preparing offline use...</p><div id="root"></div><noscript>This app needs JavaScript. On iPad open the installed Home Screen app, rather than the Files preview.</noscript><script>"use strict";(()=>{var AX=Object.create;var ix=Object.defineProperty;var sX=Object.getOwnPropertyDescriptor;var lX=Object.getOwnPropertyNames;var uX=Object.getPrototypeOf,cX=Object.prototype.hasOwnProperty;var J_=e=>{throw TypeError(e)};var Fa=(e,t,a)=>()=>{if(a)throw a[0];try{return e&&(t=e(e=0)),t}catch(r){throw a=[r],r}};var Le=(e,t)=>()=>{try{return t||e((t={exports:{}}).exports,t),t.exports}catch(a){throw t=0,a}},hu=(e,t)=>{for(var a in t)ix(e,a,{get:t[a],enumerable:!0})},fX=(e,t,a,r)=>{if(t&&typeof t=="object"||typeof t=="function")for(let n of lX(t))!cX.call(e,n)&&n!==a&&ix(e,n,{get:()=>t[n],enumerable:!(r=sX(t,n))||r.enumerable});return e};var Me=(e,t,a)=>(a=e!=null?AX(uX(e)):{},fX(t||!e||!e.__esModule?ix(a,"default",{value:e,enumerable:!0}):a,e));var $_=(e,t,a)=>t.has(e)||J_("Cannot "+a);var Vi=(e,t,a)=>($_(e,t,"read from private field"),a?a.call(e):t.get(e)),e3=(e,t,a)=>t.has(e)?J_("Cannot add the same private member more than once"):t instanceof WeakSet?t.add(e):t.set(e,a),ox=(e,t,a,r)=>($_(e,t,"write to private field"),r?r.call(e,a):t.set(e,a),a);var u3=Le(zr=>{"use strict";function ux(e,t){var a=e.length;e.push(t);e:for(;0<a;){var r=a-1>>>1,n=e[r];if(0<iy(n,t))e[r]=t,e[a]=n,a=r;else break e}}function xl(e){return e.length===0?null:e[0]}function Ay(e){if(e.length===0)return null;var t=e[0],a=e.pop();if(a!==t){e[0]=a;e:for(var r=0,n=e.length,i=n>>>1;r<i;){var o=2*(r+1)-1,A=e[o],s=o+1,l=e[s];if(0>iy(A,a))s<n&&0>iy(l,A)?(e[r]=l,e[s]=a,r=s):(e[r]=A,e[o]=a,r=o);else if(s<n&&0>iy(l,a))e[r]=l,e[s]=a,r=s;else break e}}return t}function iy(e,t){var a=e.sortIndex-t.sortIndex;return a!==0?a:e.id-t.id}zr.unstable_now=void 0;typeof performance=="object"&&typeof performance.now=="function"?(t3=performance,zr.unstable_now=function(){return t3.now()}):(Ax=Date,a3=Ax.now(),zr.unstable_now=function(){return Ax.now()-a3});var t3,Ax,a3,pu=[],Tc=[],dX=1,VA=null,Ki=3,cx=!1,bm=!1,Cm=!1,fx=!1,i3=typeof setTimeout=="function"?setTimeout:null,o3=typeof clearTimeout=="function"?clearTimeout:null,r3=typeof setImmediate<"u"?setImmediate:null;function oy(e){for(var t=xl(Tc);t!==null;){if(t.callback===null)Ay(Tc);else if(t.startTime<=e)Ay(Tc),t.sortIndex=t.expirationTime,ux(pu,t);else break;t=xl(Tc)}}function dx(e){if(Cm=!1,oy(e),!bm)if(xl(pu)!==null)bm=!0,jh||(jh=!0,Gh());else{var t=xl(Tc);t!==null&&hx(dx,t.startTime-e)}}var jh=!1,xm=-1,A3=5,s3=-1;function l3(){return fx?!0:!(zr.unstable_now()-s3<A3)}function sx(){if(fx=!1,jh){var e=zr.unstable_now();s3=e;var t=!0;try{e:{bm=!1,Cm&&(Cm=!1,o3(xm),xm=-1),cx=!0;var a=Ki;try{t:{for(oy(e),VA=xl(pu);VA!==null&&!(VA.expirationTime>e&&l3());){var r=VA.callback;if(typeof r=="function"){VA.callback=null,Ki=VA.priorityLevel;var n=r(VA.expirationTime<=e);if(e=zr.unstable_now(),typeof n=="function"){VA.callback=n,oy(e),t=!0;break t}VA===xl(pu)&&Ay(pu),oy(e)}else Ay(pu);VA=xl(pu)}if(VA!==null)t=!0;else{var i=xl(Tc);i!==null&&hx(dx,i.startTime-e),t=!1}}break e}finally{VA=null,Ki=a,cx=!1}t=void 0}}finally{t?Gh():jh=!1}}}var Gh;typeof r3=="function"?Gh=function(){r3(sx)}:typeof MessageChannel<"u"?(lx=new MessageChannel,n3=lx.port2,lx.port1.onmessage=sx,Gh=function(){n3.postMessage(null)}):Gh=function(){i3(sx,0)};var lx,n3;function hx(e,t){xm=i3(function(){e(zr.unstable_now())},t)}zr.unstable_IdlePriority=5;zr.unstable_ImmediatePriority=1;zr.unstable_LowPriority=4;zr.unstable_NormalPriority=3;zr.unstable_Profiling=null;zr.unstable_UserBlockingPriority=2;zr.unstable_cancelCallback=function(e){e.callback=null};zr.unstable_forceFrameRate=function(e){0>e||125<e?console.error("forceFrameRate takes a positive int between 0 and 125, forcing frame rates higher than 125 fps is not supported"):A3=0<e?Math.floor(1e3/e):5};zr.unstable_getCurrentPriorityLevel=function(){return Ki};zr.unstable_next=function(e){switch(Ki){case 1:case 2:case 3:var t=3;break;default:t=Ki}var a=Ki;Ki=t;try{return e()}finally{Ki=a}};zr.unstable_requestPaint=function(){fx=!0};zr.unstable_runWithPriority=function(e,t){switch(e){case 1:case 2:case 3:case 4:case 5:break;default:e=3}var a=Ki;Ki=e;try{return t()}finally{Ki=a}};zr.unstable_scheduleCallback=function(e,t,a){var r=zr.unstable_now();switch(typeof a=="object"&&a!==null?(a=a.delay,a=typeof a=="number"&&0<a?r+a:r):a=r,e){case 1:var n=-1;break;case 2:n=250;break;case 5:n=1073741823;break;case 4:n=1e4;break;default:n=5e3}return n=a+n,e={id:dX++,callback:t,priorityLevel:e,startTime:a,expirationTime:n,sortIndex:-1},a>r?(e.sortIndex=a,ux(Tc,e),xl(pu)===null&&e===xl(Tc)&&(Cm?(o3(xm),xm=-1):Cm=!0,hx(dx,a-r))):(e.sortIndex=n,ux(pu,e),bm||cx||(bm=!0,jh||(jh=!0,Gh()))),e};zr.unstable_shouldYield=l3;zr.unstable_wrapCallback=function(e){var t=Ki;return function(){var a=Ki;Ki=t;try{return e.apply(this,arguments)}finally{Ki=a}}}});var f3=Le((N1e,c3)=>{"use strict";c3.exports=u3()});var C3=Le(ua=>{"use strict";var mx=Symbol.for("react.transitional.element"),hX=Symbol.for("react.portal"),pX=Symbol.for("react.fragment"),gX=Symbol.for("react.strict_mode"),mX=Symbol.for("react.profiler"),vX=Symbol.for("react.consumer"),yX=Symbol.for("react.context"),wX=Symbol.for("react.forward_ref"),BX=Symbol.for("react.suspense"),bX=Symbol.for("react.memo"),m3=Symbol.for("react.lazy"),CX=Symbol.for("react.activity"),d3=Symbol.iterator;function xX(e){return e===null||typeof e!="object"?null:(e=d3&&e[d3]||e["@@iterator"],typeof e=="function"?e:null)}var v3={isMounted:function(){return!1},enqueueForceUpdate:function(){},enqueueReplaceState:function(){},enqueueSetState:function(){}},y3=Object.assign,w3={};function Xh(e,t,a){this.props=e,this.context=t,this.refs=w3,this.updater=a||v3}Xh.prototype.isReactComponent={};Xh.prototype.setState=function(e,t){if(typeof e!="object"&&typeof e!="function"&&e!=null)throw Error("takes an object of state variables to update or a function which returns an object of state variables.");this.updater.enqueueSetState(this,e,t,"setState")};Xh.prototype.forceUpdate=function(e){this.updater.enqueueForceUpdate(this,e,"forceUpdate")};function B3(){}B3.prototype=Xh.prototype;function vx(e,t,a){this.props=e,this.context=t,this.refs=w3,this.updater=a||v3}var yx=vx.prototype=new B3;yx.constructor=vx;y3(yx,Xh.prototype);yx.isPureReactComponent=!0;var h3=Array.isArray;function gx(){}var Er={H:null,A:null,T:null,S:null},b3=Object.prototype.hasOwnProperty;function wx(e,t,a){var r=a.ref;return{$$typeof:mx,type:e,key:t,ref:r!==void 0?r:null,props:a}}function SX(e,t){return wx(e.type,t,e.props)}function Bx(e){return typeof e=="object"&&e!==null&&e.$$typeof===mx}function LX(e){var t={"=":"=0",":":"=2"};return"$"+e.replace(/[=:]/g,function(a){return t[a]})}var p3=/\/+/g;function px(e,t){return typeof e=="object"&&e!==null&&e.key!=null?LX(""+e.key):t.toString(36)}function IX(e){switch(e.status){case"fulfilled":return e.value;case"rejected":throw e.reason;default:switch(typeof e.status=="string"?e.then(gx,gx):(e.status="pending",e.then(function(t){e.status==="pending"&&(e.status="fulfilled",e.value=t)},function(t){e.status==="pending"&&(e.status="rejected",e.reason=t)})),e.status){case"fulfilled":return e.value;case"rejected":throw e.reason}}throw e}function Wh(e,t,a,r,n){var i=typeof e;(i==="undefined"||i==="boolean")&&(e=null);var o=!1;if(e===null)o=!0;else switch(i){case"bigint":case"string":case"number":o=!0;break;case"object":switch(e.$$typeof){case mx:case hX:o=!0;break;case m3:return o=e._init,Wh(o(e._payload),t,a,r,n)}}if(o)return n=n(e),o=r===""?"."+px(e,0):r,h3(n)?(a="",o!=null&&(a=o.replace(p3,"$&/")+"/"),Wh(n,t,a,"",function(l){return l})):n!=null&&(Bx(n)&&(n=SX(n,a+(n.key==null||e&&e.key===n.key?"":(""+n.key).replace(p3,"$&/")+"/")+o)),t.push(n)),1;o=0;var A=r===""?".":r+":";if(h3(e))for(var s=0;s<e.length;s++)r=e[s],i=A+px(r,s),o+=Wh(r,t,a,i,n);else if(s=xX(e),typeof s=="function")for(e=s.call(e),s=0;!(r=e.next()).done;)r=r.value,i=A+px(r,s++),o+=Wh(r,t,a,i,n);else if(i==="object"){if(typeof e.then=="function")return Wh(IX(e),t,a,r,n);throw t=String(e),Error("Objects are not valid as a React child (found: "+(t==="[object Object]"?"object with keys {"+Object.keys(e).join(", ")+"}":t)+"). If you meant to render a collection of children, use an array instead.")}return o}function sy(e,t,a){if(e==null)return e;var r=[],n=0;return Wh(e,r,"","",function(i){return t.call(a,i,n++)}),r}function EX(e){if(e._status===-1){var t=e._result;t=t(),t.then(function(a){(e._status===0||e._status===-1)&&(e._status=1,e._result=a)},function(a){(e._status===0||e._status===-1)&&(e._status=2,e._result=a)}),e._status===-1&&(e._status=0,e._result=t)}if(e._status===1)return e._result.default;throw e._result}var g3=typeof reportError=="function"?reportError:function(e){if(typeof window=="object"&&typeof window.ErrorEvent=="function"){var t=new window.ErrorEvent("error",{bubbles:!0,cancelable:!0,message:typeof e=="object"&&e!==null&&typeof e.message=="string"?String(e.message):String(e),error:e});if(!window.dispatchEvent(t))return}else if(typeof process=="object"&&typeof process.emit=="function"){process.emit("uncaughtException",e);return}console.error(e)},FX={map:sy,forEach:function(e,t,a){sy(e,function(){t.apply(this,arguments)},a)},count:function(e){var t=0;return sy(e,function(){t++}),t},toArray:function(e){return sy(e,function(t){return t})||[]},only:function(e){if(!Bx(e))throw Error("React.Children.only expected to receive a single React element child.");return e}};ua.Activity=CX;ua.Children=FX;ua.Component=Xh;ua.Fragment=pX;ua.Profiler=mX;ua.PureComponent=vx;ua.StrictMode=gX;ua.Suspense=BX;ua.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE=Er;ua.__COMPILER_RUNTIME={__proto__:null,c:function(e){return Er.H.useMemoCache(e)}};ua.cache=function(e){return function(){return e.apply(null,arguments)}};ua.cacheSignal=function(){return null};ua.cloneElement=function(e,t,a){if(e==null)throw Error("The argument must be a React element, but you passed "+e+".");var r=y3({},e.props),n=e.key;if(t!=null)for(i in t.key!==void 0&&(n=""+t.key),t)!b3.call(t,i)||i==="key"||i==="__self"||i==="__source"||i==="ref"&&t.ref===void 0||(r[i]=t[i]);var i=arguments.length-2;if(i===1)r.children=a;else if(1<i){for(var o=Array(i),A=0;A<i;A++)o[A]=arguments[A+2];r.children=o}return wx(e.type,n,r)};ua.createContext=function(e){return e={$$typeof:yX,_currentValue:e,_currentValue2:e,_threadCount:0,Provider:null,Consumer:null},e.Provider=e,e.Consumer={$$typeof:vX,_context:e},e};ua.createElement=function(e,t,a){var r,n={},i=null;if(t!=null)for(r in t.key!==void 0&&(i=""+t.key),t)b3.call(t,r)&&r!=="key"&&r!=="__self"&&r!=="__source"&&(n[r]=t[r]);var o=arguments.length-2;if(o===1)n.children=a;else if(1<o){for(var A=Array(o),s=0;s<o;s++)A[s]=arguments[s+2];n.children=A}if(e&&e.defaultProps)for(r in o=e.defaultProps,o)n[r]===void 0&&(n[r]=o[r]);return wx(e,i,n)};ua.createRef=function(){return{current:null}};ua.forwardRef=function(e){return{$$typeof:wX,render:e}};ua.isValidElement=Bx;ua.lazy=function(e){return{$$typeof:m3,_payload:{_status:-1,_result:e},_init:EX}};ua.memo=function(e,t){return{$$typeof:bX,type:e,compare:t===void 0?null:t}};ua.startTransition=function(e){var t=Er.T,a={};Er.T=a;try{var r=e(),n=Er.S;n!==null&&n(a,r),typeof r=="object"&&r!==null&&typeof r.then=="function"&&r.then(gx,g3)}catch(i){g3(i)}finally{t!==null&&a.types!==null&&(t.types=a.types),Er.T=t}};ua.unstable_useCacheRefresh=function(){return Er.H.useCacheRefresh()};ua.use=function(e){return Er.H.use(e)};ua.useActionState=function(e,t,a){return Er.H.useActionState(e,t,a)};ua.useCallback=function(e,t){return Er.H.useCallback(e,t)};ua.useContext=function(e){return Er.H.useContext(e)};ua.useDebugValue=function(){};ua.useDeferredValue=function(e,t){return Er.H.useDeferredValue(e,t)};ua.useEffect=function(e,t){return Er.H.useEffect(e,t)};ua.useEffectEvent=function(e){return Er.H.useEffectEvent(e)};ua.useId=function(){return Er.H.useId()};ua.useImperativeHandle=function(e,t,a){return Er.H.useImperativeHandle(e,t,a)};ua.useInsertionEffect=function(e,t){return Er.H.useInsertionEffect(e,t)};ua.useLayoutEffect=function(e,t){return Er.H.useLayoutEffect(e,t)};ua.useMemo=function(e,t){return Er.H.useMemo(e,t)};ua.useOptimistic=function(e,t){return Er.H.useOptimistic(e,t)};ua.useReducer=function(e,t,a){return Er.H.useReducer(e,t,a)};ua.useRef=function(e){return Er.H.useRef(e)};ua.useState=function(e){return Er.H.useState(e)};ua.useSyncExternalStore=function(e,t,a){return Er.H.useSyncExternalStore(e,t,a)};ua.useTransition=function(){return Er.H.useTransition()};ua.version="19.2.6"});var Qt=Le((P1e,x3)=>{"use strict";x3.exports=C3()});var L3=Le(go=>{"use strict";var UX=Qt();function S3(e){var t="https://react.dev/errors/"+e;if(1<arguments.length){t+="?args[]="+encodeURIComponent(arguments[1]);for(var a=2;a<arguments.length;a++)t+="&args[]="+encodeURIComponent(arguments[a])}return"Minified React error #"+e+"; visit "+t+" for the full message or use the non-minified dev environment for full errors and additional helpful warnings."}function Rc(){}var po={d:{f:Rc,r:function(){throw Error(S3(522))},D:Rc,C:Rc,L:Rc,m:Rc,X:Rc,S:Rc,M:Rc},p:0,findDOMNode:null},_X=Symbol.for("react.portal");function TX(e,t,a){var r=3<arguments.length&&arguments[3]!==void 0?arguments[3]:null;return{$$typeof:_X,key:r==null?null:""+r,children:e,containerInfo:t,implementation:a}}var Sm=UX.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;function ly(e,t){if(e==="font")return"";if(typeof t=="string")return t==="use-credentials"?t:""}go.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE=po;go.createPortal=function(e,t){var a=2<arguments.length&&arguments[2]!==void 0?arguments[2]:null;if(!t||t.nodeType!==1&&t.nodeType!==9&&t.nodeType!==11)throw Error(S3(299));return TX(e,t,null,a)};go.flushSync=function(e){var t=Sm.T,a=po.p;try{if(Sm.T=null,po.p=2,e)return e()}finally{Sm.T=t,po.p=a,po.d.f()}};go.preconnect=function(e,t){typeof e=="string"&&(t?(t=t.crossOrigin,t=typeof t=="string"?t==="use-credentials"?t:"":void 0):t=null,po.d.C(e,t))};go.prefetchDNS=function(e){typeof e=="string"&&po.d.D(e)};go.preinit=function(e,t){if(typeof e=="string"&&t&&typeof t.as=="string"){var a=t.as,r=ly(a,t.crossOrigin),n=typeof t.integrity=="string"?t.integrity:void 0,i=typeof t.fetchPriority=="string"?t.fetchPriority:void 0;a==="style"?po.d.S(e,typeof t.precedence=="string"?t.precedence:void 0,{crossOrigin:r,integrity:n,fetchPriority:i}):a==="script"&&po.d.X(e,{crossOrigin:r,integrity:n,fetchPriority:i,nonce:typeof t.nonce=="string"?t.nonce:void 0})}};go.preinitModule=function(e,t){if(typeof e=="string")if(typeof t=="object"&&t!==null){if(t.as==null||t.as==="script"){var a=ly(t.as,t.crossOrigin);po.d.M(e,{crossOrigin:a,integrity:typeof t.integrity=="string"?t.integrity:void 0,nonce:typeof t.nonce=="string"?t.nonce:void 0})}}else t==null&&po.d.M(e)};go.preload=function(e,t){if(typeof e=="string"&&typeof t=="object"&&t!==null&&typeof t.as=="string"){var a=t.as,r=ly(a,t.crossOrigin);po.d.L(e,a,{crossOrigin:r,integrity:typeof t.integrity=="string"?t.integrity:void 0,nonce:typeof t.nonce=="string"?t.nonce:void 0,type:typeof t.type=="string"?t.type:void 0,fetchPriority:typeof t.fetchPriority=="string"?t.fetchPriority:void 0,referrerPolicy:typeof t.referrerPolicy=="string"?t.referrerPolicy:void 0,imageSrcSet:typeof t.imageSrcSet=="string"?t.imageSrcSet:void 0,imageSizes:typeof t.imageSizes=="string"?t.imageSizes:void 0,media:typeof t.media=="string"?t.media:void 0})}};go.preloadModule=function(e,t){if(typeof e=="string")if(t){var a=ly(t.as,t.crossOrigin);po.d.m(e,{as:typeof t.as=="string"&&t.as!=="script"?t.as:void 0,crossOrigin:a,integrity:typeof t.integrity=="string"?t.integrity:void 0})}else po.d.m(e)};go.requestFormReset=function(e){po.d.r(e)};go.unstable_batchedUpdates=function(e,t){return e(t)};go.useFormState=function(e,t,a){return Sm.H.useFormState(e,t,a)};go.useFormStatus=function(){return Sm.H.useHostTransitionStatus()};go.version="19.2.6"});var Yh=Le((H1e,E3)=>{"use strict";function I3(){if(!(typeof __REACT_DEVTOOLS_GLOBAL_HOOK__>"u"||typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE!="function"))try{__REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE(I3)}catch(e){console.error(e)}}I3(),E3.exports=L3()});var MO=Le(Qw=>{"use strict";var Wn=f3(),eR=Qt(),RX=Yh();function ze(e){var t="https://react.dev/errors/"+e;if(1<arguments.length){t+="?args[]="+encodeURIComponent(arguments[1]);for(var a=2;a<arguments.length;a++)t+="&args[]="+encodeURIComponent(arguments[a])}return"Minified React error #"+e+"; visit "+t+" for the full message or use the non-minified dev environment for full errors and additional helpful warnings."}function tR(e){return!(!e||e.nodeType!==1&&e.nodeType!==9&&e.nodeType!==11)}function c0(e){var t=e,a=e;if(e.alternate)for(;t.return;)t=t.return;else{e=t;do t=e,(t.flags&4098)!==0&&(a=t.return),e=t.return;while(e)}return t.tag===3?a:null}function aR(e){if(e.tag===13){var t=e.memoizedState;if(t===null&&(e=e.alternate,e!==null&&(t=e.memoizedState)),t!==null)return t.dehydrated}return null}function rR(e){if(e.tag===31){var t=e.memoizedState;if(t===null&&(e=e.alternate,e!==null&&(t=e.memoizedState)),t!==null)return t.dehydrated}return null}function F3(e){if(c0(e)!==e)throw Error(ze(188))}function QX(e){var t=e.alternate;if(!t){if(t=c0(e),t===null)throw Error(ze(188));return t!==e?null:e}for(var a=e,r=t;;){var n=a.return;if(n===null)break;var i=n.alternate;if(i===null){if(r=n.return,r!==null){a=r;continue}break}if(n.child===i.child){for(i=n.child;i;){if(i===a)return F3(n),e;if(i===r)return F3(n),t;i=i.sibling}throw Error(ze(188))}if(a.return!==r.return)a=n,r=i;else{for(var o=!1,A=n.child;A;){if(A===a){o=!0,a=n,r=i;break}if(A===r){o=!0,r=n,a=i;break}A=A.sibling}if(!o){for(A=i.child;A;){if(A===a){o=!0,a=i,r=n;break}if(A===r){o=!0,r=i,a=n;break}A=A.sibling}if(!o)throw Error(ze(189))}}if(a.alternate!==r)throw Error(ze(190))}if(a.tag!==3)throw Error(ze(188));return a.stateNode.current===a?e:t}function nR(e){var t=e.tag;if(t===5||t===26||t===27||t===6)return e;for(e=e.child;e!==null;){if(t=nR(e),t!==null)return t;e=e.sibling}return null}var _r=Object.assign,OX=Symbol.for("react.element"),uy=Symbol.for("react.transitional.element"),Rm=Symbol.for("react.portal"),ap=Symbol.for("react.fragment"),iR=Symbol.for("react.strict_mode"),tS=Symbol.for("react.profiler"),oR=Symbol.for("react.consumer"),Cu=Symbol.for("react.context"),YS=Symbol.for("react.forward_ref"),aS=Symbol.for("react.suspense"),rS=Symbol.for("react.suspense_list"),ZS=Symbol.for("react.memo"),Qc=Symbol.for("react.lazy"),nS=Symbol.for("react.activity"),DX=Symbol.for("react.memo_cache_sentinel"),U3=Symbol.iterator;function Lm(e){return e===null||typeof e!="object"?null:(e=U3&&e[U3]||e["@@iterator"],typeof e=="function"?e:null)}var NX=Symbol.for("react.client.reference");function iS(e){if(e==null)return null;if(typeof e=="function")return e.$$typeof===NX?null:e.displayName||e.name||null;if(typeof e=="string")return e;switch(e){case ap:return"Fragment";case tS:return"Profiler";case iR:return"StrictMode";case aS:return"Suspense";case rS:return"SuspenseList";case nS:return"Activity"}if(typeof e=="object")switch(e.$$typeof){case Rm:return"Portal";case Cu:return e.displayName||"Context";case oR:return(e._context.displayName||"Context")+".Consumer";case YS:var t=e.render;return e=e.displayName,e||(e=t.displayName||t.name||"",e=e!==""?"ForwardRef("+e+")":"ForwardRef"),e;case ZS:return t=e.displayName||null,t!==null?t:iS(e.type)||"Memo";case Qc:t=e._payload,e=e._init;try{return iS(e(t))}catch{}}return null}var Qm=Array.isArray,Zt=eR.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE,ja=RX.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE,ad={pending:!1,data:null,method:null,action:null},oS=[],rp=-1;function Fl(e){return{current:e}}function Ai(e){0>rp||(e.current=oS[rp],oS[rp]=null,rp--)}function Cr(e,t){rp++,oS[rp]=e.current,e.current=t}var El=Fl(null),Zm=Fl(null),Kc=Fl(null),zy=Fl(null);function Vy(e,t){switch(Cr(Kc,t),Cr(Zm,e),Cr(El,null),t.nodeType){case 9:case 11:e=(e=t.documentElement)&&(e=e.namespaceURI)?NT(e):0;break;default:if(e=t.tagName,t=t.namespaceURI)t=NT(t),e=LO(t,e);else switch(e){case"svg":e=1;break;case"math":e=2;break;default:e=0}}Ai(El),Cr(El,e)}function Bp(){Ai(El),Ai(Zm),Ai(Kc)}function AS(e){e.memoizedState!==null&&Cr(zy,e);var t=El.current,a=LO(t,e.type);t!==a&&(Cr(Zm,e),Cr(El,a))}function Ky(e){Zm.current===e&&(Ai(El),Ai(Zm)),zy.current===e&&(Ai(zy),s0._currentValue=ad)}var bx,_3;function Jf(e){if(bx===void 0)try{throw Error()}catch(a){var t=a.stack.trim().match(/\n( *(at )?)/);bx=t&&t[1]||"",_3=-1<a.stack.indexOf(`
     at`)?" (<anonymous>)":-1<a.stack.indexOf("@")?"@unknown:0:0":""}return`
@@ -18303,6 +18307,9 @@ function m_({ offline: e = !1 } = {}) {
     [salesOk, setSalesOk] = (0, wa.useState)(!1),
     // Editing tab uses the same password as Sales
     [editOk, setEditOk] = (0, wa.useState)(!1),
+    // Inventory and Stocktake use the same password too
+    [invOk, setInvOk] = (0, wa.useState)(!1),
+    [stkOk, setStkOk] = (0, wa.useState)(!1),
     // Inventory heading / subheading filters (same as the checkout)
     [invCat, setInvCat] = (0, wa.useState)("all"),
     [invSub, setInvSub] = (0, wa.useState)("all"),
@@ -18572,7 +18579,8 @@ function m_({ offline: e = !1 } = {}) {
   // ----- Sales tab: password -----
   async function unlockSales(G, where = "sales") {
     G.preventDefault();
-    let open = () => (where === "editing" ? setEditOk(!0) : setSalesOk(!0));
+    let open = () =>
+      where === "editing" ? setEditOk(!0) : where === "inventory" ? setInvOk(!0) : where === "stocktake" ? setStkOk(!0) : setSalesOk(!0);
     setPwErr("");
     let f = new FormData(G.currentTarget),
       pw = String(f.get("pw") || "");
@@ -18616,7 +18624,7 @@ function m_({ offline: e = !1 } = {}) {
   }
   // Password screen shared by Editing and Sales (one password for both)
   function lockForm(where) {
-    let name = where === "editing" ? "Editing" : "Sales";
+    let name = { editing: "Editing", inventory: "Inventory", stocktake: "Stocktake" }[where] || "Sales";
     return (0, T.jsxs)(
       "form",
       {
@@ -18629,8 +18637,12 @@ function m_({ offline: e = !1 } = {}) {
             children: t.salesPw
               ? name === "Editing"
                 ? "Changing items, headings and markets is protected."
+                : name === "Inventory"
+                ? "The day\u2019s stock counts are protected."
+                : name === "Stocktake"
+                ? "The stocktake presets are protected."
                 : "Sales records are protected."
-              : "One password protects both Editing and Sales. You will need it each time you open them.",
+              : "One password protects Inventory, Stocktake, Editing and Sales. You will need it each time you open them.",
           }),
           (0, T.jsxs)("label", {
             className: "field",
@@ -18658,6 +18670,41 @@ function m_({ offline: e = !1 } = {}) {
       "lock-" + where,
     );
   }
+  // Heading for a locked tab: title, plus Change password / Lock when open
+  let lockedHead = (key, eyebrow, title, sub, isOpen, lock) =>
+    (0, T.jsxs)(
+      "div",
+      {
+        className: "section-heading locked-head",
+        children: [
+          (0, T.jsxs)("div", {
+            children: [
+              (0, T.jsx)("p", { className: "eyebrow", children: eyebrow }),
+              (0, T.jsx)("h1", { children: title }),
+              sub,
+            ],
+          }),
+          isOpen &&
+            (0, T.jsxs)("div", {
+              className: "row-actions",
+              children: [
+                (0, T.jsx)("button", { className: "secondary", onClick: () => (setPwErr(""), setPwDlg(!0)), children: "Change password" }),
+                (0, T.jsx)("button", { className: "secondary", onClick: lock, children: "Lock" }),
+              ],
+            }),
+        ],
+      },
+      key,
+    );
+  let invHead = lockedHead(
+      "inv-head",
+      "MORNING STOCKTAKE",
+      "Inventory",
+      ve && (0, T.jsxs)("p", { className: "stock-day", children: [lsDayLabel(today), " \xB7 ", ve] }),
+      invOk,
+      () => (stDirty && ve && saveStock(), setInvOk(!1)),
+    ),
+    stkHead = lockedHead("stk-head", "BASE STOCKTAKE PRESETS", "Stocktake", null, stkOk, () => setStkOk(!1));
   let editHead = (0, T.jsxs)(
     "div",
     {
@@ -18891,7 +18938,7 @@ function m_({ offline: e = !1 } = {}) {
                   },
         );
         (Y.kind === "preset" && setStkSel(""),
-          Y.kind === "reset-sales" && (setSalesOk(!1), setEditOk(!1)), Y.kind.startsWith("sales") && setSelGrp(""));
+          Y.kind === "reset-sales" && (setSalesOk(!1), setEditOk(!1), setInvOk(!1), setStkOk(!1)), Y.kind.startsWith("sales") && setSelGrp(""));
         Y.kind === "market" && Y.item.name === ve && pickMarket("");
         (Y.kind === "product" &&
           ((Gt.current = ""),
@@ -18922,7 +18969,7 @@ function m_({ offline: e = !1 } = {}) {
           : Y?.kind === "sales-all"
             ? "This permanently deletes every sale recorded in the app. Download any sheets you need first."
             : Y?.kind === "reset-sales"
-              ? "Without the password, the only way back into Editing and Sales is to delete every sales record. Items, headings, markets and today’s stocktake are kept. You will then create a new password."
+              ? "Without the password, the only way back into the locked tabs is to delete every sales record. Items, headings, markets and today’s stocktake are kept. You will then create a new password."
         : Y?.kind === "category" && Y.item.parent_id
           ? `Items in this subheading will move to ${t.categories.find((G) => G.id === Y.item.parent_id)?.name || "the main heading"}.`
           : "This also removes its subheadings. Its items stay, listed as Uncategorised.";
@@ -19074,7 +19121,11 @@ function m_({ offline: e = !1 } = {}) {
         onValueChange: (G) => {
           // Leaving Inventory with unsaved counts saves them; leaving Sales locks it again
           (l === "inventory" && stDirty && ve && saveStock(),
-            l === "stocktake" && stkDirty && stkName.trim() && Object.values(stCounts(stkDraft)).some((v) => v > 0) && saveStk(), l === "sales" && G !== "sales" && setSalesOk(!1), l === "editing" && G !== "editing" && setEditOk(!1), setPwErr(""), u(G));
+            l === "stocktake" && stkDirty && stkName.trim() && Object.values(stCounts(stkDraft)).some((v) => v > 0) && saveStk(), l === "sales" && G !== "sales" && setSalesOk(!1), l === "editing" && G !== "editing" && setEditOk(!1),
+            l === "inventory" && G !== "inventory" && setInvOk(!1),
+            l === "stocktake" && G !== "stocktake" && setStkOk(!1),
+            setPwErr(""),
+            u(G));
         },
         children: [
           (0, T.jsxs)(rE, {
@@ -19371,17 +19422,11 @@ function m_({ offline: e = !1 } = {}) {
             value: "inventory",
             children: (0, T.jsxs)("section", {
               className: "page inventory-page",
-              children: [
-                (0, T.jsx)("div", {
-                  className: "section-heading",
-                  children: (0, T.jsxs)("div", {
-                    children: [
-                      (0, T.jsx)("p", { className: "eyebrow", children: "MORNING STOCKTAKE" }),
-                      (0, T.jsx)("h1", { children: "Inventory" }),
-                      ve && (0, T.jsxs)("p", { className: "stock-day", children: [lsDayLabel(today), " \xB7 ", ve] }),
-                    ],
-                  }),
-                }),
+              // Locked: heading + password screen only
+              children: !invOk
+                ? [invHead, lockForm("inventory")]
+                : [
+                invHead,
                 !ve
                   ? (0, T.jsxs)("div", {
                       className: "welcome",
@@ -19620,16 +19665,10 @@ function m_({ offline: e = !1 } = {}) {
             value: "stocktake",
             children: (0, T.jsxs)("section", {
               className: "page inventory-page stocktake-page",
-              children: [
-                (0, T.jsx)("div", {
-                  className: "section-heading",
-                  children: (0, T.jsxs)("div", {
-                    children: [
-                      (0, T.jsx)("p", { className: "eyebrow", children: "BASE STOCKTAKE PRESETS" }),
-                      (0, T.jsx)("h1", { children: "Stocktake" }),
-                    ],
-                  }),
-                }),
+              children: !stkOk
+                ? [stkHead, lockForm("stocktake")]
+                : [
+                stkHead,
                 (0, T.jsx)("div", {
                   className: "notice",
                   children:
@@ -20962,7 +21001,7 @@ function m_({ offline: e = !1 } = {}) {
           className: "dialog-box",
           children: [
             (0, T.jsx)(qd, { children: "Change the password" }),
-            (0, T.jsx)(zd, { children: "This password opens both Editing and Sales. Enter the current password, then the new one twice." }),
+            (0, T.jsx)(zd, { children: "This password opens Inventory, Stocktake, Editing and Sales. Enter the current password, then the new one twice." }),
             (0, T.jsxs)("form", {
               onSubmit: changePw,
               children: [
