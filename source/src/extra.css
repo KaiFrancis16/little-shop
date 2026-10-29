@@ -725,3 +725,64 @@
   align-items: center;
   gap: 8px;
 }
+
+/* ---------- Round 11: sync between iPads ---------- */
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 720px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid #dce5df;
+  background: #fff;
+  font-weight: 600;
+  color: #3b5043;
+}
+.sync-status.sync-ok {
+  background: #eaf5ee;
+  border-color: #b9dcc6;
+  color: #155c3e;
+}
+.sync-status.sync-error {
+  background: #fbefef;
+  border-color: #f0c9cb;
+  color: #8c262c;
+}
+.sync-status.sync-offline {
+  background: #fdf6e8;
+  border-color: #efd9a8;
+  color: #7a5414;
+}
+.sync-status svg {
+  flex-shrink: 0;
+}
+.sync-status .spin {
+  animation: ls-spin 1s linear infinite;
+}
+@keyframes ls-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.sync-form {
+  display: grid;
+  gap: 12px;
+  max-width: 560px;
+}
+.sync-actions {
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+.sync-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sync-note {
+  margin-top: 14px;
+  font-size: 13px;
+  max-width: 560px;
+}

@@ -9143,6 +9143,67 @@ header {
   gap: 8px;
 }
 
+/* ---------- Round 11: sync between iPads ---------- */
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 720px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid #dce5df;
+  background: #fff;
+  font-weight: 600;
+  color: #3b5043;
+}
+.sync-status.sync-ok {
+  background: #eaf5ee;
+  border-color: #b9dcc6;
+  color: #155c3e;
+}
+.sync-status.sync-error {
+  background: #fbefef;
+  border-color: #f0c9cb;
+  color: #8c262c;
+}
+.sync-status.sync-offline {
+  background: #fdf6e8;
+  border-color: #efd9a8;
+  color: #7a5414;
+}
+.sync-status svg {
+  flex-shrink: 0;
+}
+.sync-status .spin {
+  animation: ls-spin 1s linear infinite;
+}
+@keyframes ls-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.sync-form {
+  display: grid;
+  gap: 12px;
+  max-width: 560px;
+}
+.sync-actions {
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+.sync-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sync-note {
+  margin-top: 14px;
+  font-size: 13px;
+  max-width: 560px;
+}
+
 </style></head><body><p id="install-status" role="status" class="sr-only">Preparing offline use...</p><div id="root"></div><noscript>This app needs JavaScript. On iPad open the installed Home Screen app, rather than the Files preview.</noscript><script>"use strict";(()=>{var AX=Object.create;var ix=Object.defineProperty;var sX=Object.getOwnPropertyDescriptor;var lX=Object.getOwnPropertyNames;var uX=Object.getPrototypeOf,cX=Object.prototype.hasOwnProperty;var J_=e=>{throw TypeError(e)};var Fa=(e,t,a)=>()=>{if(a)throw a[0];try{return e&&(t=e(e=0)),t}catch(r){throw a=[r],r}};var Le=(e,t)=>()=>{try{return t||e((t={exports:{}}).exports,t),t.exports}catch(a){throw t=0,a}},hu=(e,t)=>{for(var a in t)ix(e,a,{get:t[a],enumerable:!0})},fX=(e,t,a,r)=>{if(t&&typeof t=="object"||typeof t=="function")for(let n of lX(t))!cX.call(e,n)&&n!==a&&ix(e,n,{get:()=>t[n],enumerable:!(r=sX(t,n))||r.enumerable});return e};var Me=(e,t,a)=>(a=e!=null?AX(uX(e)):{},fX(t||!e||!e.__esModule?ix(a,"default",{value:e,enumerable:!0}):a,e));var $_=(e,t,a)=>t.has(e)||J_("Cannot "+a);var Vi=(e,t,a)=>($_(e,t,"read from private field"),a?a.call(e):t.get(e)),e3=(e,t,a)=>t.has(e)?J_("Cannot add the same private member more than once"):t instanceof WeakSet?t.add(e):t.set(e,a),ox=(e,t,a,r)=>($_(e,t,"write to private field"),r?r.call(e,a):t.set(e,a),a);var u3=Le(zr=>{"use strict";function ux(e,t){var a=e.length;e.push(t);e:for(;0<a;){var r=a-1>>>1,n=e[r];if(0<iy(n,t))e[r]=t,e[a]=n,a=r;else break e}}function xl(e){return e.length===0?null:e[0]}function Ay(e){if(e.length===0)return null;var t=e[0],a=e.pop();if(a!==t){e[0]=a;e:for(var r=0,n=e.length,i=n>>>1;r<i;){var o=2*(r+1)-1,A=e[o],s=o+1,l=e[s];if(0>iy(A,a))s<n&&0>iy(l,A)?(e[r]=l,e[s]=a,r=s):(e[r]=A,e[o]=a,r=o);else if(s<n&&0>iy(l,a))e[r]=l,e[s]=a,r=s;else break e}}return t}function iy(e,t){var a=e.sortIndex-t.sortIndex;return a!==0?a:e.id-t.id}zr.unstable_now=void 0;typeof performance=="object"&&typeof performance.now=="function"?(t3=performance,zr.unstable_now=function(){return t3.now()}):(Ax=Date,a3=Ax.now(),zr.unstable_now=function(){return Ax.now()-a3});var t3,Ax,a3,pu=[],Tc=[],dX=1,VA=null,Ki=3,cx=!1,bm=!1,Cm=!1,fx=!1,i3=typeof setTimeout=="function"?setTimeout:null,o3=typeof clearTimeout=="function"?clearTimeout:null,r3=typeof setImmediate<"u"?setImmediate:null;function oy(e){for(var t=xl(Tc);t!==null;){if(t.callback===null)Ay(Tc);else if(t.startTime<=e)Ay(Tc),t.sortIndex=t.expirationTime,ux(pu,t);else break;t=xl(Tc)}}function dx(e){if(Cm=!1,oy(e),!bm)if(xl(pu)!==null)bm=!0,jh||(jh=!0,Gh());else{var t=xl(Tc);t!==null&&hx(dx,t.startTime-e)}}var jh=!1,xm=-1,A3=5,s3=-1;function l3(){return fx?!0:!(zr.unstable_now()-s3<A3)}function sx(){if(fx=!1,jh){var e=zr.unstable_now();s3=e;var t=!0;try{e:{bm=!1,Cm&&(Cm=!1,o3(xm),xm=-1),cx=!0;var a=Ki;try{t:{for(oy(e),VA=xl(pu);VA!==null&&!(VA.expirationTime>e&&l3());){var r=VA.callback;if(typeof r=="function"){VA.callback=null,Ki=VA.priorityLevel;var n=r(VA.expirationTime<=e);if(e=zr.unstable_now(),typeof n=="function"){VA.callback=n,oy(e),t=!0;break t}VA===xl(pu)&&Ay(pu),oy(e)}else Ay(pu);VA=xl(pu)}if(VA!==null)t=!0;else{var i=xl(Tc);i!==null&&hx(dx,i.startTime-e),t=!1}}break e}finally{VA=null,Ki=a,cx=!1}t=void 0}}finally{t?Gh():jh=!1}}}var Gh;typeof r3=="function"?Gh=function(){r3(sx)}:typeof MessageChannel<"u"?(lx=new MessageChannel,n3=lx.port2,lx.port1.onmessage=sx,Gh=function(){n3.postMessage(null)}):Gh=function(){i3(sx,0)};var lx,n3;function hx(e,t){xm=i3(function(){e(zr.unstable_now())},t)}zr.unstable_IdlePriority=5;zr.unstable_ImmediatePriority=1;zr.unstable_LowPriority=4;zr.unstable_NormalPriority=3;zr.unstable_Profiling=null;zr.unstable_UserBlockingPriority=2;zr.unstable_cancelCallback=function(e){e.callback=null};zr.unstable_forceFrameRate=function(e){0>e||125<e?console.error("forceFrameRate takes a positive int between 0 and 125, forcing frame rates higher than 125 fps is not supported"):A3=0<e?Math.floor(1e3/e):5};zr.unstable_getCurrentPriorityLevel=function(){return Ki};zr.unstable_next=function(e){switch(Ki){case 1:case 2:case 3:var t=3;break;default:t=Ki}var a=Ki;Ki=t;try{return e()}finally{Ki=a}};zr.unstable_requestPaint=function(){fx=!0};zr.unstable_runWithPriority=function(e,t){switch(e){case 1:case 2:case 3:case 4:case 5:break;default:e=3}var a=Ki;Ki=e;try{return t()}finally{Ki=a}};zr.unstable_scheduleCallback=function(e,t,a){var r=zr.unstable_now();switch(typeof a=="object"&&a!==null?(a=a.delay,a=typeof a=="number"&&0<a?r+a:r):a=r,e){case 1:var n=-1;break;case 2:n=250;break;case 5:n=1073741823;break;case 4:n=1e4;break;default:n=5e3}return n=a+n,e={id:dX++,callback:t,priorityLevel:e,startTime:a,expirationTime:n,sortIndex:-1},a>r?(e.sortIndex=a,ux(Tc,e),xl(pu)===null&&e===xl(Tc)&&(Cm?(o3(xm),xm=-1):Cm=!0,hx(dx,a-r))):(e.sortIndex=n,ux(pu,e),bm||cx||(bm=!0,jh||(jh=!0,Gh()))),e};zr.unstable_shouldYield=l3;zr.unstable_wrapCallback=function(e){var t=Ki;return function(){var a=Ki;Ki=t;try{return e.apply(this,arguments)}finally{Ki=a}}}});var f3=Le((N1e,c3)=>{"use strict";c3.exports=u3()});var C3=Le(ua=>{"use strict";var mx=Symbol.for("react.transitional.element"),hX=Symbol.for("react.portal"),pX=Symbol.for("react.fragment"),gX=Symbol.for("react.strict_mode"),mX=Symbol.for("react.profiler"),vX=Symbol.for("react.consumer"),yX=Symbol.for("react.context"),wX=Symbol.for("react.forward_ref"),BX=Symbol.for("react.suspense"),bX=Symbol.for("react.memo"),m3=Symbol.for("react.lazy"),CX=Symbol.for("react.activity"),d3=Symbol.iterator;function xX(e){return e===null||typeof e!="object"?null:(e=d3&&e[d3]||e["@@iterator"],typeof e=="function"?e:null)}var v3={isMounted:function(){return!1},enqueueForceUpdate:function(){},enqueueReplaceState:function(){},enqueueSetState:function(){}},y3=Object.assign,w3={};function Xh(e,t,a){this.props=e,this.context=t,this.refs=w3,this.updater=a||v3}Xh.prototype.isReactComponent={};Xh.prototype.setState=function(e,t){if(typeof e!="object"&&typeof e!="function"&&e!=null)throw Error("takes an object of state variables to update or a function which returns an object of state variables.");this.updater.enqueueSetState(this,e,t,"setState")};Xh.prototype.forceUpdate=function(e){this.updater.enqueueForceUpdate(this,e,"forceUpdate")};function B3(){}B3.prototype=Xh.prototype;function vx(e,t,a){this.props=e,this.context=t,this.refs=w3,this.updater=a||v3}var yx=vx.prototype=new B3;yx.constructor=vx;y3(yx,Xh.prototype);yx.isPureReactComponent=!0;var h3=Array.isArray;function gx(){}var Er={H:null,A:null,T:null,S:null},b3=Object.prototype.hasOwnProperty;function wx(e,t,a){var r=a.ref;return{$$typeof:mx,type:e,key:t,ref:r!==void 0?r:null,props:a}}function SX(e,t){return wx(e.type,t,e.props)}function Bx(e){return typeof e=="object"&&e!==null&&e.$$typeof===mx}function LX(e){var t={"=":"=0",":":"=2"};return"$"+e.replace(/[=:]/g,function(a){return t[a]})}var p3=/\/+/g;function px(e,t){return typeof e=="object"&&e!==null&&e.key!=null?LX(""+e.key):t.toString(36)}function IX(e){switch(e.status){case"fulfilled":return e.value;case"rejected":throw e.reason;default:switch(typeof e.status=="string"?e.then(gx,gx):(e.status="pending",e.then(function(t){e.status==="pending"&&(e.status="fulfilled",e.value=t)},function(t){e.status==="pending"&&(e.status="rejected",e.reason=t)})),e.status){case"fulfilled":return e.value;case"rejected":throw e.reason}}throw e}function Wh(e,t,a,r,n){var i=typeof e;(i==="undefined"||i==="boolean")&&(e=null);var o=!1;if(e===null)o=!0;else switch(i){case"bigint":case"string":case"number":o=!0;break;case"object":switch(e.$$typeof){case mx:case hX:o=!0;break;case m3:return o=e._init,Wh(o(e._payload),t,a,r,n)}}if(o)return n=n(e),o=r===""?"."+px(e,0):r,h3(n)?(a="",o!=null&&(a=o.replace(p3,"$&/")+"/"),Wh(n,t,a,"",function(l){return l})):n!=null&&(Bx(n)&&(n=SX(n,a+(n.key==null||e&&e.key===n.key?"":(""+n.key).replace(p3,"$&/")+"/")+o)),t.push(n)),1;o=0;var A=r===""?".":r+":";if(h3(e))for(var s=0;s<e.length;s++)r=e[s],i=A+px(r,s),o+=Wh(r,t,a,i,n);else if(s=xX(e),typeof s=="function")for(e=s.call(e),s=0;!(r=e.next()).done;)r=r.value,i=A+px(r,s++),o+=Wh(r,t,a,i,n);else if(i==="object"){if(typeof e.then=="function")return Wh(IX(e),t,a,r,n);throw t=String(e),Error("Objects are not valid as a React child (found: "+(t==="[object Object]"?"object with keys {"+Object.keys(e).join(", ")+"}":t)+"). If you meant to render a collection of children, use an array instead.")}return o}function sy(e,t,a){if(e==null)return e;var r=[],n=0;return Wh(e,r,"","",function(i){return t.call(a,i,n++)}),r}function EX(e){if(e._status===-1){var t=e._result;t=t(),t.then(function(a){(e._status===0||e._status===-1)&&(e._status=1,e._result=a)},function(a){(e._status===0||e._status===-1)&&(e._status=2,e._result=a)}),e._status===-1&&(e._status=0,e._result=t)}if(e._status===1)return e._result.default;throw e._result}var g3=typeof reportError=="function"?reportError:function(e){if(typeof window=="object"&&typeof window.ErrorEvent=="function"){var t=new window.ErrorEvent("error",{bubbles:!0,cancelable:!0,message:typeof e=="object"&&e!==null&&typeof e.message=="string"?String(e.message):String(e),error:e});if(!window.dispatchEvent(t))return}else if(typeof process=="object"&&typeof process.emit=="function"){process.emit("uncaughtException",e);return}console.error(e)},FX={map:sy,forEach:function(e,t,a){sy(e,function(){t.apply(this,arguments)},a)},count:function(e){var t=0;return sy(e,function(){t++}),t},toArray:function(e){return sy(e,function(t){return t})||[]},only:function(e){if(!Bx(e))throw Error("React.Children.only expected to receive a single React element child.");return e}};ua.Activity=CX;ua.Children=FX;ua.Component=Xh;ua.Fragment=pX;ua.Profiler=mX;ua.PureComponent=vx;ua.StrictMode=gX;ua.Suspense=BX;ua.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE=Er;ua.__COMPILER_RUNTIME={__proto__:null,c:function(e){return Er.H.useMemoCache(e)}};ua.cache=function(e){return function(){return e.apply(null,arguments)}};ua.cacheSignal=function(){return null};ua.cloneElement=function(e,t,a){if(e==null)throw Error("The argument must be a React element, but you passed "+e+".");var r=y3({},e.props),n=e.key;if(t!=null)for(i in t.key!==void 0&&(n=""+t.key),t)!b3.call(t,i)||i==="key"||i==="__self"||i==="__source"||i==="ref"&&t.ref===void 0||(r[i]=t[i]);var i=arguments.length-2;if(i===1)r.children=a;else if(1<i){for(var o=Array(i),A=0;A<i;A++)o[A]=arguments[A+2];r.children=o}return wx(e.type,n,r)};ua.createContext=function(e){return e={$$typeof:yX,_currentValue:e,_currentValue2:e,_threadCount:0,Provider:null,Consumer:null},e.Provider=e,e.Consumer={$$typeof:vX,_context:e},e};ua.createElement=function(e,t,a){var r,n={},i=null;if(t!=null)for(r in t.key!==void 0&&(i=""+t.key),t)b3.call(t,r)&&r!=="key"&&r!=="__self"&&r!=="__source"&&(n[r]=t[r]);var o=arguments.length-2;if(o===1)n.children=a;else if(1<o){for(var A=Array(o),s=0;s<o;s++)A[s]=arguments[s+2];n.children=A}if(e&&e.defaultProps)for(r in o=e.defaultProps,o)n[r]===void 0&&(n[r]=o[r]);return wx(e,i,n)};ua.createRef=function(){return{current:null}};ua.forwardRef=function(e){return{$$typeof:wX,render:e}};ua.isValidElement=Bx;ua.lazy=function(e){return{$$typeof:m3,_payload:{_status:-1,_result:e},_init:EX}};ua.memo=function(e,t){return{$$typeof:bX,type:e,compare:t===void 0?null:t}};ua.startTransition=function(e){var t=Er.T,a={};Er.T=a;try{var r=e(),n=Er.S;n!==null&&n(a,r),typeof r=="object"&&r!==null&&typeof r.then=="function"&&r.then(gx,g3)}catch(i){g3(i)}finally{t!==null&&a.types!==null&&(t.types=a.types),Er.T=t}};ua.unstable_useCacheRefresh=function(){return Er.H.useCacheRefresh()};ua.use=function(e){return Er.H.use(e)};ua.useActionState=function(e,t,a){return Er.H.useActionState(e,t,a)};ua.useCallback=function(e,t){return Er.H.useCallback(e,t)};ua.useContext=function(e){return Er.H.useContext(e)};ua.useDebugValue=function(){};ua.useDeferredValue=function(e,t){return Er.H.useDeferredValue(e,t)};ua.useEffect=function(e,t){return Er.H.useEffect(e,t)};ua.useEffectEvent=function(e){return Er.H.useEffectEvent(e)};ua.useId=function(){return Er.H.useId()};ua.useImperativeHandle=function(e,t,a){return Er.H.useImperativeHandle(e,t,a)};ua.useInsertionEffect=function(e,t){return Er.H.useInsertionEffect(e,t)};ua.useLayoutEffect=function(e,t){return Er.H.useLayoutEffect(e,t)};ua.useMemo=function(e,t){return Er.H.useMemo(e,t)};ua.useOptimistic=function(e,t){return Er.H.useOptimistic(e,t)};ua.useReducer=function(e,t,a){return Er.H.useReducer(e,t,a)};ua.useRef=function(e){return Er.H.useRef(e)};ua.useState=function(e){return Er.H.useState(e)};ua.useSyncExternalStore=function(e,t,a){return Er.H.useSyncExternalStore(e,t,a)};ua.useTransition=function(){return Er.H.useTransition()};ua.version="19.2.6"});var Qt=Le((P1e,x3)=>{"use strict";x3.exports=C3()});var L3=Le(go=>{"use strict";var UX=Qt();function S3(e){var t="https://react.dev/errors/"+e;if(1<arguments.length){t+="?args[]="+encodeURIComponent(arguments[1]);for(var a=2;a<arguments.length;a++)t+="&args[]="+encodeURIComponent(arguments[a])}return"Minified React error #"+e+"; visit "+t+" for the full message or use the non-minified dev environment for full errors and additional helpful warnings."}function Rc(){}var po={d:{f:Rc,r:function(){throw Error(S3(522))},D:Rc,C:Rc,L:Rc,m:Rc,X:Rc,S:Rc,M:Rc},p:0,findDOMNode:null},_X=Symbol.for("react.portal");function TX(e,t,a){var r=3<arguments.length&&arguments[3]!==void 0?arguments[3]:null;return{$$typeof:_X,key:r==null?null:""+r,children:e,containerInfo:t,implementation:a}}var Sm=UX.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;function ly(e,t){if(e==="font")return"";if(typeof t=="string")return t==="use-credentials"?t:""}go.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE=po;go.createPortal=function(e,t){var a=2<arguments.length&&arguments[2]!==void 0?arguments[2]:null;if(!t||t.nodeType!==1&&t.nodeType!==9&&t.nodeType!==11)throw Error(S3(299));return TX(e,t,null,a)};go.flushSync=function(e){var t=Sm.T,a=po.p;try{if(Sm.T=null,po.p=2,e)return e()}finally{Sm.T=t,po.p=a,po.d.f()}};go.preconnect=function(e,t){typeof e=="string"&&(t?(t=t.crossOrigin,t=typeof t=="string"?t==="use-credentials"?t:"":void 0):t=null,po.d.C(e,t))};go.prefetchDNS=function(e){typeof e=="string"&&po.d.D(e)};go.preinit=function(e,t){if(typeof e=="string"&&t&&typeof t.as=="string"){var a=t.as,r=ly(a,t.crossOrigin),n=typeof t.integrity=="string"?t.integrity:void 0,i=typeof t.fetchPriority=="string"?t.fetchPriority:void 0;a==="style"?po.d.S(e,typeof t.precedence=="string"?t.precedence:void 0,{crossOrigin:r,integrity:n,fetchPriority:i}):a==="script"&&po.d.X(e,{crossOrigin:r,integrity:n,fetchPriority:i,nonce:typeof t.nonce=="string"?t.nonce:void 0})}};go.preinitModule=function(e,t){if(typeof e=="string")if(typeof t=="object"&&t!==null){if(t.as==null||t.as==="script"){var a=ly(t.as,t.crossOrigin);po.d.M(e,{crossOrigin:a,integrity:typeof t.integrity=="string"?t.integrity:void 0,nonce:typeof t.nonce=="string"?t.nonce:void 0})}}else t==null&&po.d.M(e)};go.preload=function(e,t){if(typeof e=="string"&&typeof t=="object"&&t!==null&&typeof t.as=="string"){var a=t.as,r=ly(a,t.crossOrigin);po.d.L(e,a,{crossOrigin:r,integrity:typeof t.integrity=="string"?t.integrity:void 0,nonce:typeof t.nonce=="string"?t.nonce:void 0,type:typeof t.type=="string"?t.type:void 0,fetchPriority:typeof t.fetchPriority=="string"?t.fetchPriority:void 0,referrerPolicy:typeof t.referrerPolicy=="string"?t.referrerPolicy:void 0,imageSrcSet:typeof t.imageSrcSet=="string"?t.imageSrcSet:void 0,imageSizes:typeof t.imageSizes=="string"?t.imageSizes:void 0,media:typeof t.media=="string"?t.media:void 0})}};go.preloadModule=function(e,t){if(typeof e=="string")if(t){var a=ly(t.as,t.crossOrigin);po.d.m(e,{as:typeof t.as=="string"&&t.as!=="script"?t.as:void 0,crossOrigin:a,integrity:typeof t.integrity=="string"?t.integrity:void 0})}else po.d.m(e)};go.requestFormReset=function(e){po.d.r(e)};go.unstable_batchedUpdates=function(e,t){return e(t)};go.useFormState=function(e,t,a){return Sm.H.useFormState(e,t,a)};go.useFormStatus=function(){return Sm.H.useHostTransitionStatus()};go.version="19.2.6"});var Yh=Le((H1e,E3)=>{"use strict";function I3(){if(!(typeof __REACT_DEVTOOLS_GLOBAL_HOOK__>"u"||typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE!="function"))try{__REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE(I3)}catch(e){console.error(e)}}I3(),E3.exports=L3()});var MO=Le(Qw=>{"use strict";var Wn=f3(),eR=Qt(),RX=Yh();function ze(e){var t="https://react.dev/errors/"+e;if(1<arguments.length){t+="?args[]="+encodeURIComponent(arguments[1]);for(var a=2;a<arguments.length;a++)t+="&args[]="+encodeURIComponent(arguments[a])}return"Minified React error #"+e+"; visit "+t+" for the full message or use the non-minified dev environment for full errors and additional helpful warnings."}function tR(e){return!(!e||e.nodeType!==1&&e.nodeType!==9&&e.nodeType!==11)}function c0(e){var t=e,a=e;if(e.alternate)for(;t.return;)t=t.return;else{e=t;do t=e,(t.flags&4098)!==0&&(a=t.return),e=t.return;while(e)}return t.tag===3?a:null}function aR(e){if(e.tag===13){var t=e.memoizedState;if(t===null&&(e=e.alternate,e!==null&&(t=e.memoizedState)),t!==null)return t.dehydrated}return null}function rR(e){if(e.tag===31){var t=e.memoizedState;if(t===null&&(e=e.alternate,e!==null&&(t=e.memoizedState)),t!==null)return t.dehydrated}return null}function F3(e){if(c0(e)!==e)throw Error(ze(188))}function QX(e){var t=e.alternate;if(!t){if(t=c0(e),t===null)throw Error(ze(188));return t!==e?null:e}for(var a=e,r=t;;){var n=a.return;if(n===null)break;var i=n.alternate;if(i===null){if(r=n.return,r!==null){a=r;continue}break}if(n.child===i.child){for(i=n.child;i;){if(i===a)return F3(n),e;if(i===r)return F3(n),t;i=i.sibling}throw Error(ze(188))}if(a.return!==r.return)a=n,r=i;else{for(var o=!1,A=n.child;A;){if(A===a){o=!0,a=n,r=i;break}if(A===r){o=!0,r=n,a=i;break}A=A.sibling}if(!o){for(A=i.child;A;){if(A===a){o=!0,a=i,r=n;break}if(A===r){o=!0,r=i,a=n;break}A=A.sibling}if(!o)throw Error(ze(189))}}if(a.alternate!==r)throw Error(ze(190))}if(a.tag!==3)throw Error(ze(188));return a.stateNode.current===a?e:t}function nR(e){var t=e.tag;if(t===5||t===26||t===27||t===6)return e;for(e=e.child;e!==null;){if(t=nR(e),t!==null)return t;e=e.sibling}return null}var _r=Object.assign,OX=Symbol.for("react.element"),uy=Symbol.for("react.transitional.element"),Rm=Symbol.for("react.portal"),ap=Symbol.for("react.fragment"),iR=Symbol.for("react.strict_mode"),tS=Symbol.for("react.profiler"),oR=Symbol.for("react.consumer"),Cu=Symbol.for("react.context"),YS=Symbol.for("react.forward_ref"),aS=Symbol.for("react.suspense"),rS=Symbol.for("react.suspense_list"),ZS=Symbol.for("react.memo"),Qc=Symbol.for("react.lazy"),nS=Symbol.for("react.activity"),DX=Symbol.for("react.memo_cache_sentinel"),U3=Symbol.iterator;function Lm(e){return e===null||typeof e!="object"?null:(e=U3&&e[U3]||e["@@iterator"],typeof e=="function"?e:null)}var NX=Symbol.for("react.client.reference");function iS(e){if(e==null)return null;if(typeof e=="function")return e.$$typeof===NX?null:e.displayName||e.name||null;if(typeof e=="string")return e;switch(e){case ap:return"Fragment";case tS:return"Profiler";case iR:return"StrictMode";case aS:return"Suspense";case rS:return"SuspenseList";case nS:return"Activity"}if(typeof e=="object")switch(e.$$typeof){case Rm:return"Portal";case Cu:return e.displayName||"Context";case oR:return(e._context.displayName||"Context")+".Consumer";case YS:var t=e.render;return e=e.displayName,e||(e=t.displayName||t.name||"",e=e!==""?"ForwardRef("+e+")":"ForwardRef"),e;case ZS:return t=e.displayName||null,t!==null?t:iS(e.type)||"Memo";case Qc:t=e._payload,e=e._init;try{return iS(e(t))}catch{}}return null}var Qm=Array.isArray,Zt=eR.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE,ja=RX.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE,ad={pending:!1,data:null,method:null,action:null},oS=[],rp=-1;function Fl(e){return{current:e}}function Ai(e){0>rp||(e.current=oS[rp],oS[rp]=null,rp--)}function Cr(e,t){rp++,oS[rp]=e.current,e.current=t}var El=Fl(null),Zm=Fl(null),Kc=Fl(null),zy=Fl(null);function Vy(e,t){switch(Cr(Kc,t),Cr(Zm,e),Cr(El,null),t.nodeType){case 9:case 11:e=(e=t.documentElement)&&(e=e.namespaceURI)?NT(e):0;break;default:if(e=t.tagName,t=t.namespaceURI)t=NT(t),e=LO(t,e);else switch(e){case"svg":e=1;break;case"math":e=2;break;default:e=0}}Ai(El),Cr(El,e)}function Bp(){Ai(El),Ai(Zm),Ai(Kc)}function AS(e){e.memoizedState!==null&&Cr(zy,e);var t=El.current,a=LO(t,e.type);t!==a&&(Cr(Zm,e),Cr(El,a))}function Ky(e){Zm.current===e&&(Ai(El),Ai(Zm)),zy.current===e&&(Ai(zy),s0._currentValue=ad)}var bx,_3;function Jf(e){if(bx===void 0)try{throw Error()}catch(a){var t=a.stack.trim().match(/\n( *(at )?)/);bx=t&&t[1]||"",_3=-1<a.stack.indexOf(`
     at`)?" (<anonymous>)":-1<a.stack.indexOf("@")?"@unknown:0:0":""}return`
 `+bx+e+_3}var Cx=!1;function xx(e,t){if(!e||Cx)return"";Cx=!0;var a=Error.prepareStackTrace;Error.prepareStackTrace=void 0;try{var r={DetermineComponentFrameRoot:function(){try{if(t){var p=function(){throw Error()};if(Object.defineProperty(p.prototype,"props",{set:function(){throw Error()}}),typeof Reflect=="object"&&Reflect.construct){try{Reflect.construct(p,[])}catch(c){var v=c}Reflect.construct(e,[],p)}else{try{p.call()}catch(c){v=c}e.call(p.prototype)}}else{try{throw Error()}catch(c){v=c}(p=e())&&typeof p.catch=="function"&&p.catch(function(){})}}catch(c){if(c&&v&&typeof c.stack=="string")return[c.stack,v.stack]}return[null,null]}};r.DetermineComponentFrameRoot.displayName="DetermineComponentFrameRoot";var n=Object.getOwnPropertyDescriptor(r.DetermineComponentFrameRoot,"name");n&&n.configurable&&Object.defineProperty(r.DetermineComponentFrameRoot,"name",{value:"DetermineComponentFrameRoot"});var i=r.DetermineComponentFrameRoot(),o=i[0],A=i[1];if(o&&A){var s=o.split(`
@@ -9543,7 +9604,14 @@ function oJ(e, t) {
   } else throw Error("Unknown action.");
   return (e.revision++, { ...e, receipt: r });
 }
-var jO = (e) => G5((t) => oJ(t, e)),
+// Every change is stamped with its time (and deletions remembered) so two iPads can sync
+var jO = (e) =>
+    G5((t) => {
+      t.sync ||= {};
+      let before = lsSnap(t),
+        res = oJ(t, e);
+      return (lsStamp(t, before, new Date().toISOString()), res);
+    }),
   WO = (e) =>
     typeof e == "string" &&
     (!e || /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(e)) &&
@@ -18355,6 +18423,249 @@ function lsDeliver(doc, filename) {
 }
 // =======================================================================================
 
+// ===================== Sync between iPads (via a private GitHub repository) =====================
+// Each change is stamped with the time it was made (record.u). When an iPad is online it reads the
+// shared copy from GitHub, merges it with its own (most recent change wins; sales from both are kept;
+// deletions are remembered as "tombstones"), writes the result back, and applies it locally.
+// The access key is kept only on this iPad (localStorage), never in the synced data.
+var LS_SYNC_KEY = "little-shop-sync",
+  LS_SYNC_FILE = "little-shop-data.json",
+  LS_SYNC_IMG_DIR = "little-shop-photos/",
+  LS_COLL = ["products", "categories", "markets", "stockPresets", "stocktakes", "sales"];
+function lsSyncCfg() {
+  try {
+    return JSON.parse(localStorage.getItem(LS_SYNC_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+function lsSyncSave(c) {
+  try {
+    c ? localStorage.setItem(LS_SYNC_KEY, JSON.stringify(c)) : localStorage.removeItem(LS_SYNC_KEY);
+  } catch {}
+}
+var lsNoU = (r) => {
+    let { u, ...rest } = r;
+    return rest;
+  },
+  lsT = (x) => (x && x.u) || "";
+// Snapshot before a change, so the change can be stamped afterwards
+function lsSnap(t) {
+  let o = {};
+  for (let c of LS_COLL) o[c] = new Map((t[c] || []).map((r) => [r.id, JSON.stringify(lsNoU(r))]));
+  o.pw = JSON.stringify(t.salesPw || null);
+  return o;
+}
+function lsStamp(t, before, now) {
+  t.sync ||= {};
+  t.sync.tomb ||= {};
+  for (let c of LS_COLL) {
+    let after = new Set();
+    for (let r of t[c] || []) {
+      after.add(r.id);
+      before[c].get(r.id) !== JSON.stringify(lsNoU(r)) && (r.u = now);
+    }
+    for (let id of before[c].keys()) after.has(id) || (t.sync.tomb[c + ":" + id] = now);
+  }
+  JSON.stringify(t.salesPw || null) !== before.pw && (t.sync.pwU = now);
+}
+// Merge two copies. Same result whichever order they are given in.
+function lsMerge(A, B) {
+  let tA = (A.sync && A.sync.tomb) || {},
+    tB = (B.sync && B.sync.tomb) || {},
+    tomb = { ...tA };
+  for (let [k, v] of Object.entries(tB)) (!tomb[k] || v > tomb[k]) && (tomb[k] = v);
+  let pick = (x, y) => {
+      if (!x) return y;
+      if (!y) return x;
+      let a = lsT(x),
+        b = lsT(y);
+      if (a !== b) return a > b ? x : y;
+      let jx = JSON.stringify(x),
+        jy = JSON.stringify(y);
+      return jx >= jy ? x : y;
+    },
+    out = {};
+  for (let c of LS_COLL) {
+    let m = new Map(),
+      order = [];
+    for (let r of [...(A[c] || []), ...(B[c] || [])]) {
+      m.has(r.id) || order.push(r.id);
+      m.set(r.id, pick(m.get(r.id), r));
+    }
+    let list = order.map((id) => m.get(id)).filter((r) => !(tomb[c + ":" + r.id] && tomb[c + ":" + r.id] >= lsT(r)));
+    c === "products" || c === "categories"
+      ? list.sort((x, y) => x.name.localeCompare(y.name) || (x.id < y.id ? -1 : 1))
+      : c === "sales"
+        ? list.sort((x, y) => (x.at === y.at ? (x.id < y.id ? 1 : -1) : x.at < y.at ? 1 : -1))
+        : c === "markets" || c === "stockPresets"
+          ? list.sort((x, y) => x.name.localeCompare(y.name) || (x.id < y.id ? -1 : 1))
+          : list.sort((x, y) => (x.id < y.id ? -1 : 1));
+    out[c] = list;
+  }
+  // Password: most recent change wins
+  let pa = (A.sync && A.sync.pwU) || "",
+    pb = (B.sync && B.sync.pwU) || "",
+    useA = pa !== pb ? pa > pb : JSON.stringify(A.salesPw || null) >= JSON.stringify(B.salesPw || null);
+  out.salesPw = useA ? A.salesPw : B.salesPw;
+  out.sync = { tomb, pwU: useA ? pa : pb };
+  return out;
+}
+// ---- GitHub helpers ----
+function lsB64enc(str) {
+  let bytes = new TextEncoder().encode(str),
+    bin = "";
+  for (let i = 0; i < bytes.length; i += 32768) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+  return btoa(bin);
+}
+function lsB64dec(b64) {
+  let bin = atob(b64.replace(/\s/g, "")),
+    bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+async function lsSha1(s) {
+  let buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function lsGh(cfg) {
+  let base = (cfg.api || "https://api.github.com").replace(/\/$/, ""),
+    repo = String(cfg.repo || "").trim().replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/$/, ""),
+    H = { Authorization: "Bearer " + String(cfg.token || "").trim(), Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
+    url = (path) => base + "/repos/" + repo + "/contents/" + path;
+  async function call(method, path, body, accept) {
+    let r;
+    try {
+      r = await fetch(url(path) + (method === "GET" ? (path.includes("?") ? "&" : "?") + "t=" + Date.now() : ""), {
+        method,
+        cache: "no-store",
+        headers: { ...H, ...(accept ? { Accept: accept } : {}), ...(body ? { "Content-Type": "application/json" } : {}) },
+        body: body ? JSON.stringify(body) : void 0,
+      });
+    } catch {
+      throw Error("offline");
+    }
+    if (r.status === 401) throw Error("GitHub didn’t accept the access key. Check it in Editing → Sync (it may have expired).");
+    return r;
+  }
+  return {
+    repo,
+    async getFile(path) {
+      let r = await call("GET", path);
+      if (r.status === 404) return null;
+      if (r.status === 403) throw Error("The access key isn’t allowed to read this repository. Check its permissions.");
+      if (!r.ok) throw Error("GitHub problem (" + r.status + "). Try again later.");
+      let j = await r.json();
+      if (j.content && j.encoding === "base64") return { sha: j.sha, text: lsB64dec(j.content) };
+      let raw = await call("GET", path, null, "application/vnd.github.raw+json");
+      if (!raw.ok) throw Error("GitHub problem (" + raw.status + ") reading " + path + ".");
+      return { sha: j.sha, text: await raw.text() };
+    },
+    async putFile(path, text, sha, message) {
+      let r = await call("PUT", path, { message, content: lsB64enc(text), ...(sha ? { sha } : {}) });
+      if (r.status === 409 || r.status === 422) return { conflict: !0, status: r.status };
+      if (r.status === 403 || r.status === 404)
+        throw Error("The access key isn’t allowed to save to this repository. It needs Contents: Read and write.");
+      if (!r.ok) throw Error("GitHub problem (" + r.status + ") saving. Try again later.");
+      return { ok: !0 };
+    },
+    async repoOk() {
+      let r;
+      try {
+        r = await fetch(base + "/repos/" + repo + "?t=" + Date.now(), { cache: "no-store", headers: H });
+      } catch {
+        throw Error("offline");
+      }
+      if (r.status === 401) throw Error("GitHub didn’t accept the access key. Check it in Editing → Sync (it may have expired).");
+      return r.ok;
+    },
+  };
+}
+// One full sync. Returns the new local state.
+async function lsSyncRun(cfg) {
+  if (!cfg || !cfg.repo || !cfg.token) throw Error("Sync isn’t set up on this iPad yet.");
+  if (navigator.onLine === !1) throw Error("offline");
+  let gh = lsGh(cfg),
+    device = (cfg.device || "iPad").slice(0, 40);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    // After a clash, wait a moment before re-reading (GitHub can take a few seconds to show the latest save)
+    attempt && (await new Promise((res) => setTimeout(res, 1500 * attempt)));
+    // 1. Read the shared copy
+    let file = await gh.getFile(LS_SYNC_FILE),
+      remote = null;
+    if (!file) {
+      if (!(await gh.repoOk())) throw Error("Can’t find the repository “" + gh.repo + "”, or the access key can’t see it.");
+    } else {
+      try {
+        remote = JSON.parse(file.text);
+      } catch {
+        throw Error("The shared copy on GitHub is damaged. Ask for help before syncing.");
+      }
+      if (remote.format !== "little-shop-sync") throw Error("The GitHub file isn’t a Little Shop sync file.");
+    }
+    // 2. Photos: match the shared copy's photo references with photos already on this iPad, download the rest
+    let local = await GO(),
+      byHash = new Map();
+    for (let p of local.products || []) p.image && p.image.startsWith("data:") && byHash.set(await lsSha1(p.image), p.image);
+    let known = new Set(remote ? remote.images || [] : []);
+    if (remote)
+      for (let p of remote.products || [])
+        if (p.image && p.image.startsWith("gh:")) {
+          let h = p.image.slice(3);
+          if (!byHash.has(h)) {
+            let f = await gh.getFile(LS_SYNC_IMG_DIR + h + ".txt");
+            f && f.text.startsWith("data:image/") && byHash.set(h, f.text);
+          }
+          p.image = byHash.get(h) || "";
+        }
+    // 3. Merge. A new iPad (no items yet) takes the shared password; an iPad with items keeps its own on first sync.
+    let first = !cfg.lastSync,
+      L = { ...local, sync: { ...(local.sync || {}) } };
+    if (first && remote && remote.salesPw && !(local.products || []).length)
+      ((L.salesPw = remote.salesPw), (L.sync.pwU = (remote.sync && remote.sync.pwU) || ""));
+    else if (first && (local.products || []).length && L.salesPw) L.sync.pwU = new Date().toISOString();
+    let merged = lsMerge(L, remote || {});
+    // 4. Upload photos that aren't on GitHub yet, then the shared copy (only if something changed)
+    let up = { format: "little-shop-sync", version: 1, images: [] };
+    for (let c of LS_COLL) up[c] = merged[c];
+    let used = new Set();
+    up.products = await Promise.all(
+      merged.products.map(async (p) => {
+        if (!p.image || !p.image.startsWith("data:")) return p;
+        let h = await lsSha1(p.image);
+        if (!known.has(h)) {
+          let res = await gh.putFile(LS_SYNC_IMG_DIR + h + ".txt", p.image, null, "Photo for " + p.name);
+          known.add(h);
+          void res;
+        }
+        used.add(h);
+        return { ...p, image: "gh:" + h };
+      }),
+    );
+    up.images = [...used].sort();
+    up.salesPw = merged.salesPw || null;
+    up.sync = merged.sync;
+    let text = JSON.stringify(up);
+    if (!file || text !== file.text) {
+      let res = await gh.putFile(LS_SYNC_FILE, text, file && file.sha, "Sync from " + device);
+      if (res.conflict) continue; // the other iPad saved at the same moment: start again
+    }
+    // 5. Apply locally (merging again in case something changed on this iPad meanwhile)
+    let forcePw = first && remote && remote.salesPw && !(local.products || []).length;
+    return await G5((t) => {
+      t.sync ||= {};
+      forcePw && ((t.salesPw = merged.salesPw), (t.sync.pwU = merged.sync.pwU));
+      let m = lsMerge(t, merged);
+      for (let c of LS_COLL) t[c] = m[c];
+      m.salesPw ? (t.salesPw = m.salesPw) : delete t.salesPw;
+      t.sync = m.sync;
+      return t;
+    });
+  }
+  throw Error("The other iPad was syncing at the same time. It will try again shortly.");
+}
+// =======================================================================================
+
 function m_({ offline: e = !1 } = {}) {
   let [t, a] = (0, wa.useState)(R1e),
     [r, n] = (0, wa.useState)(!1),
@@ -18403,6 +18714,11 @@ function m_({ offline: e = !1 } = {}) {
     [recentView, setRecentView] = (0, wa.useState)(""),
     [recentDel, setRecentDel] = (0, wa.useState)(""),
     [recentErr, setRecentErr] = (0, wa.useState)(""),
+    // Sync between iPads (GitHub)
+    [syncCfg, setSyncCfg] = (0, wa.useState)(() => lsSyncCfg()),
+    [syncStat, setSyncStat] = (0, wa.useState)({ state: "idle" }),
+    [syncFormErr, setSyncFormErr] = (0, wa.useState)(""),
+    syncBusy = (0, wa.useRef)(!1),
     // Inventory (morning stocktake)
     [invQ, setInvQ] = (0, wa.useState)(""),
     [stDraft, setStDraft] = (0, wa.useState)({}),
@@ -18613,6 +18929,49 @@ function m_({ offline: e = !1 } = {}) {
     } finally {
       ((ut.current = !1), s(!1));
     }
+  }
+  // ----- Sync between iPads -----
+  async function doSync() {
+    let cfg = lsSyncCfg();
+    if (!cfg || !cfg.token || syncBusy.current) return;
+    ((syncBusy.current = !0), setSyncStat((x) => ({ ...x, state: "syncing" })));
+    try {
+      let st = await lsSyncRun(cfg);
+      (a(st), (cfg.lastSync = new Date().toISOString()), lsSyncSave(cfg), setSyncCfg({ ...cfg }), setSyncStat({ state: "ok", at: cfg.lastSync }));
+    } catch (err) {
+      setSyncStat({ state: err.message === "offline" ? "offline" : "error", msg: err.message, at: cfg.lastSync });
+    } finally {
+      syncBusy.current = !1;
+    }
+  }
+  let syncRef = (0, wa.useRef)(doSync);
+  syncRef.current = doSync;
+  // Automatic: when the app opens, comes back online or to the front, every 3 minutes, and shortly after a change
+  (0, wa.useEffect)(() => {
+    if (!r) return;
+    let go = () => document.visibilityState !== "hidden" && syncRef.current(),
+      iv = setInterval(go, 18e4);
+    (go(), window.addEventListener("online", go), document.addEventListener("visibilitychange", go));
+    return () => (clearInterval(iv), window.removeEventListener("online", go), document.removeEventListener("visibilitychange", go));
+  }, [r]);
+  (0, wa.useEffect)(() => {
+    if (!r || !lsSyncCfg()) return;
+    let tm = setTimeout(() => syncRef.current(), 8e3);
+    return () => clearTimeout(tm);
+  }, [t.revision]);
+  async function saveSyncSettings(G) {
+    G.preventDefault();
+    setSyncFormErr("");
+    let f = new FormData(G.currentTarget),
+      repo = String(f.get("repo") || "").trim(),
+      token = String(f.get("token") || "").trim() || (syncCfg && syncCfg.token) || "",
+      device = String(f.get("device") || "").trim();
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo.replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "")))
+      return setSyncFormErr("Enter the repository as owner/name, e.g. KaiFrancis16/little-shop-data.");
+    if (!token) return setSyncFormErr("Paste the GitHub access key.");
+    let same = syncCfg && syncCfg.repo === repo && syncCfg.token === token,
+      cfg = { ...(syncCfg || {}), repo, token, device, ...(same ? {} : { lastSync: null }) };
+    (lsSyncSave(cfg), setSyncCfg(cfg), await doSync());
   }
   // ----- Last 3 sales (Checkout) -----
   let recent3 = [...t.sales].sort((x, y) => (x.at < y.at ? 1 : -1)).slice(0, 3);
@@ -20092,6 +20451,7 @@ function m_({ offline: e = !1 } = {}) {
                     ["items", "Items", Du],
                     ["headings", "Headings", Ou],
                     ["markets", "Markets", LsMapPin],
+                    ["sync", "Sync", qp],
                   ].map(([key, label, Icon]) =>
                     (0, T.jsxs)(
                       "button",
@@ -20359,6 +20719,123 @@ function m_({ offline: e = !1 } = {}) {
                               }),
                             ],
                           }),
+                    ],
+                  }),
+                // ---------- Sync ----------
+                es === "sync" &&
+                  (0, T.jsxs)("div", {
+                    className: "editing-section sync-section",
+                    children: [
+                      (0, T.jsx)("div", { className: "editing-section-heading", children: (0, T.jsx)("h2", { children: "Sync between iPads" }) }),
+                      (0, T.jsx)("p", {
+                        className: "muted editing-help",
+                        children:
+                          "When this iPad has internet (e.g. on the house Wi-Fi) it shares its changes with the other iPad through your private GitHub repository, and picks up theirs. At markets without internet it keeps working and catches up later. If the same thing was changed on both iPads, the most recent change wins; sales from both iPads are always kept.",
+                      }),
+                      (0, T.jsxs)("div", {
+                        className: "sync-status sync-" + (syncCfg && syncCfg.token ? syncStat.state : "off"),
+                        role: "status",
+                        children: [
+                          (0, T.jsx)(qp, { size: 20, className: syncStat.state === "syncing" ? "spin" : "" }),
+                          (0, T.jsx)("span", {
+                            children: !(syncCfg && syncCfg.token)
+                              ? "Sync is not set up on this iPad."
+                              : syncStat.state === "syncing"
+                                ? "Syncing…"
+                                : syncStat.state === "error"
+                                  ? syncStat.msg
+                                  : syncStat.state === "offline"
+                                    ? "No internet right now — will sync automatically when back on Wi-Fi." +
+                                      (syncCfg.lastSync ? " Last synced " + lsDayLabel(lsDay(syncCfg.lastSync)) + " " + lsTime(syncCfg.lastSync) + "." : "")
+                                    : syncCfg.lastSync
+                                      ? "Last synced " + lsDayLabel(lsDay(syncCfg.lastSync)) + " at " + lsTime(syncCfg.lastSync) + "."
+                                      : "Set up — not synced yet.",
+                          }),
+                        ],
+                      }),
+                      (0, T.jsxs)(
+                        "form",
+                        {
+                          className: "sync-form",
+                          onSubmit: saveSyncSettings,
+                          children: [
+                            (0, T.jsxs)("label", {
+                              className: "field",
+                              children: [
+                                "GitHub repository (owner/name)",
+                                (0, T.jsx)("input", {
+                                  name: "repo",
+                                  autoComplete: "off",
+                                  autoCapitalize: "none",
+                                  spellCheck: !1,
+                                  defaultValue: (syncCfg && syncCfg.repo) || "KaiFrancis16/little-shop-data",
+                                }),
+                              ],
+                            }),
+                            (0, T.jsxs)("label", {
+                              className: "field",
+                              children: [
+                                "GitHub access key",
+                                (0, T.jsx)("input", {
+                                  name: "token",
+                                  type: "password",
+                                  autoComplete: "off",
+                                  autoCapitalize: "none",
+                                  spellCheck: !1,
+                                  placeholder: syncCfg && syncCfg.token ? "Saved — leave blank to keep it" : "Paste the key (starts with github_pat_)",
+                                }),
+                              ],
+                            }),
+                            (0, T.jsxs)("label", {
+                              className: "field",
+                              children: [
+                                "This iPad’s name",
+                                (0, T.jsx)("input", {
+                                  name: "device",
+                                  maxLength: 40,
+                                  autoComplete: "off",
+                                  defaultValue: (syncCfg && syncCfg.device) || "",
+                                  placeholder: "e.g. Mum’s iPad",
+                                }),
+                              ],
+                            }),
+                            syncFormErr && (0, T.jsx)("p", { role: "alert", className: "form-error", children: syncFormErr }),
+                            (0, T.jsxs)("div", {
+                              className: "row-actions sync-actions",
+                              children: [
+                                (0, T.jsx)("button", {
+                                  className: "primary",
+                                  disabled: syncStat.state === "syncing",
+                                  children: syncCfg && syncCfg.token ? "Save and sync now" : "Set up and sync now",
+                                }),
+                                syncCfg &&
+                                  syncCfg.token &&
+                                  (0, T.jsxs)("button", {
+                                    type: "button",
+                                    className: "secondary",
+                                    disabled: syncStat.state === "syncing",
+                                    onClick: () => doSync(),
+                                    children: [(0, T.jsx)(qp, {}), "Sync now"],
+                                  }),
+                                syncCfg &&
+                                  syncCfg.token &&
+                                  (0, T.jsx)("button", {
+                                    type: "button",
+                                    className: "danger-outline",
+                                    onClick: () => (lsSyncSave(null), setSyncCfg(null), setSyncStat({ state: "idle" })),
+                                    children: "Turn off sync on this iPad",
+                                  }),
+                              ],
+                            }),
+                          ],
+                        },
+                        "sync-form-" + ((syncCfg && syncCfg.repo) || ""),
+                      ),
+                      (0, T.jsx)("p", {
+                        className: "muted sync-note",
+                        children:
+                          "The access key is stored only on this iPad and is never shared with the other iPad. Turning sync off doesn’t delete anything.",
+                      }),
                     ],
                   }),
                 // ---------- Markets ----------

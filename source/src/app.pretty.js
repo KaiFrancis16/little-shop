@@ -302,7 +302,14 @@ function oJ(e, t) {
   } else throw Error("Unknown action.");
   return (e.revision++, { ...e, receipt: r });
 }
-var jO = (e) => G5((t) => oJ(t, e)),
+// Every change is stamped with its time (and deletions remembered) so two iPads can sync
+var jO = (e) =>
+    G5((t) => {
+      t.sync ||= {};
+      let before = lsSnap(t),
+        res = oJ(t, e);
+      return (lsStamp(t, before, new Date().toISOString()), res);
+    }),
   WO = (e) =>
     typeof e == "string" &&
     (!e || /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(e)) &&
@@ -9114,6 +9121,249 @@ function lsDeliver(doc, filename) {
 }
 // =======================================================================================
 
+// ===================== Sync between iPads (via a private GitHub repository) =====================
+// Each change is stamped with the time it was made (record.u). When an iPad is online it reads the
+// shared copy from GitHub, merges it with its own (most recent change wins; sales from both are kept;
+// deletions are remembered as "tombstones"), writes the result back, and applies it locally.
+// The access key is kept only on this iPad (localStorage), never in the synced data.
+var LS_SYNC_KEY = "little-shop-sync",
+  LS_SYNC_FILE = "little-shop-data.json",
+  LS_SYNC_IMG_DIR = "little-shop-photos/",
+  LS_COLL = ["products", "categories", "markets", "stockPresets", "stocktakes", "sales"];
+function lsSyncCfg() {
+  try {
+    return JSON.parse(localStorage.getItem(LS_SYNC_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+function lsSyncSave(c) {
+  try {
+    c ? localStorage.setItem(LS_SYNC_KEY, JSON.stringify(c)) : localStorage.removeItem(LS_SYNC_KEY);
+  } catch {}
+}
+var lsNoU = (r) => {
+    let { u, ...rest } = r;
+    return rest;
+  },
+  lsT = (x) => (x && x.u) || "";
+// Snapshot before a change, so the change can be stamped afterwards
+function lsSnap(t) {
+  let o = {};
+  for (let c of LS_COLL) o[c] = new Map((t[c] || []).map((r) => [r.id, JSON.stringify(lsNoU(r))]));
+  o.pw = JSON.stringify(t.salesPw || null);
+  return o;
+}
+function lsStamp(t, before, now) {
+  t.sync ||= {};
+  t.sync.tomb ||= {};
+  for (let c of LS_COLL) {
+    let after = new Set();
+    for (let r of t[c] || []) {
+      after.add(r.id);
+      before[c].get(r.id) !== JSON.stringify(lsNoU(r)) && (r.u = now);
+    }
+    for (let id of before[c].keys()) after.has(id) || (t.sync.tomb[c + ":" + id] = now);
+  }
+  JSON.stringify(t.salesPw || null) !== before.pw && (t.sync.pwU = now);
+}
+// Merge two copies. Same result whichever order they are given in.
+function lsMerge(A, B) {
+  let tA = (A.sync && A.sync.tomb) || {},
+    tB = (B.sync && B.sync.tomb) || {},
+    tomb = { ...tA };
+  for (let [k, v] of Object.entries(tB)) (!tomb[k] || v > tomb[k]) && (tomb[k] = v);
+  let pick = (x, y) => {
+      if (!x) return y;
+      if (!y) return x;
+      let a = lsT(x),
+        b = lsT(y);
+      if (a !== b) return a > b ? x : y;
+      let jx = JSON.stringify(x),
+        jy = JSON.stringify(y);
+      return jx >= jy ? x : y;
+    },
+    out = {};
+  for (let c of LS_COLL) {
+    let m = new Map(),
+      order = [];
+    for (let r of [...(A[c] || []), ...(B[c] || [])]) {
+      m.has(r.id) || order.push(r.id);
+      m.set(r.id, pick(m.get(r.id), r));
+    }
+    let list = order.map((id) => m.get(id)).filter((r) => !(tomb[c + ":" + r.id] && tomb[c + ":" + r.id] >= lsT(r)));
+    c === "products" || c === "categories"
+      ? list.sort((x, y) => x.name.localeCompare(y.name) || (x.id < y.id ? -1 : 1))
+      : c === "sales"
+        ? list.sort((x, y) => (x.at === y.at ? (x.id < y.id ? 1 : -1) : x.at < y.at ? 1 : -1))
+        : c === "markets" || c === "stockPresets"
+          ? list.sort((x, y) => x.name.localeCompare(y.name) || (x.id < y.id ? -1 : 1))
+          : list.sort((x, y) => (x.id < y.id ? -1 : 1));
+    out[c] = list;
+  }
+  // Password: most recent change wins
+  let pa = (A.sync && A.sync.pwU) || "",
+    pb = (B.sync && B.sync.pwU) || "",
+    useA = pa !== pb ? pa > pb : JSON.stringify(A.salesPw || null) >= JSON.stringify(B.salesPw || null);
+  out.salesPw = useA ? A.salesPw : B.salesPw;
+  out.sync = { tomb, pwU: useA ? pa : pb };
+  return out;
+}
+// ---- GitHub helpers ----
+function lsB64enc(str) {
+  let bytes = new TextEncoder().encode(str),
+    bin = "";
+  for (let i = 0; i < bytes.length; i += 32768) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+  return btoa(bin);
+}
+function lsB64dec(b64) {
+  let bin = atob(b64.replace(/\s/g, "")),
+    bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+async function lsSha1(s) {
+  let buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function lsGh(cfg) {
+  let base = (cfg.api || "https://api.github.com").replace(/\/$/, ""),
+    repo = String(cfg.repo || "").trim().replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/$/, ""),
+    H = { Authorization: "Bearer " + String(cfg.token || "").trim(), Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
+    url = (path) => base + "/repos/" + repo + "/contents/" + path;
+  async function call(method, path, body, accept) {
+    let r;
+    try {
+      r = await fetch(url(path) + (method === "GET" ? (path.includes("?") ? "&" : "?") + "t=" + Date.now() : ""), {
+        method,
+        cache: "no-store",
+        headers: { ...H, ...(accept ? { Accept: accept } : {}), ...(body ? { "Content-Type": "application/json" } : {}) },
+        body: body ? JSON.stringify(body) : void 0,
+      });
+    } catch {
+      throw Error("offline");
+    }
+    if (r.status === 401) throw Error("GitHub didn’t accept the access key. Check it in Editing → Sync (it may have expired).");
+    return r;
+  }
+  return {
+    repo,
+    async getFile(path) {
+      let r = await call("GET", path);
+      if (r.status === 404) return null;
+      if (r.status === 403) throw Error("The access key isn’t allowed to read this repository. Check its permissions.");
+      if (!r.ok) throw Error("GitHub problem (" + r.status + "). Try again later.");
+      let j = await r.json();
+      if (j.content && j.encoding === "base64") return { sha: j.sha, text: lsB64dec(j.content) };
+      let raw = await call("GET", path, null, "application/vnd.github.raw+json");
+      if (!raw.ok) throw Error("GitHub problem (" + raw.status + ") reading " + path + ".");
+      return { sha: j.sha, text: await raw.text() };
+    },
+    async putFile(path, text, sha, message) {
+      let r = await call("PUT", path, { message, content: lsB64enc(text), ...(sha ? { sha } : {}) });
+      if (r.status === 409 || r.status === 422) return { conflict: !0, status: r.status };
+      if (r.status === 403 || r.status === 404)
+        throw Error("The access key isn’t allowed to save to this repository. It needs Contents: Read and write.");
+      if (!r.ok) throw Error("GitHub problem (" + r.status + ") saving. Try again later.");
+      return { ok: !0 };
+    },
+    async repoOk() {
+      let r;
+      try {
+        r = await fetch(base + "/repos/" + repo + "?t=" + Date.now(), { cache: "no-store", headers: H });
+      } catch {
+        throw Error("offline");
+      }
+      if (r.status === 401) throw Error("GitHub didn’t accept the access key. Check it in Editing → Sync (it may have expired).");
+      return r.ok;
+    },
+  };
+}
+// One full sync. Returns the new local state.
+async function lsSyncRun(cfg) {
+  if (!cfg || !cfg.repo || !cfg.token) throw Error("Sync isn’t set up on this iPad yet.");
+  if (navigator.onLine === !1) throw Error("offline");
+  let gh = lsGh(cfg),
+    device = (cfg.device || "iPad").slice(0, 40);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    // After a clash, wait a moment before re-reading (GitHub can take a few seconds to show the latest save)
+    attempt && (await new Promise((res) => setTimeout(res, 1500 * attempt)));
+    // 1. Read the shared copy
+    let file = await gh.getFile(LS_SYNC_FILE),
+      remote = null;
+    if (!file) {
+      if (!(await gh.repoOk())) throw Error("Can’t find the repository “" + gh.repo + "”, or the access key can’t see it.");
+    } else {
+      try {
+        remote = JSON.parse(file.text);
+      } catch {
+        throw Error("The shared copy on GitHub is damaged. Ask for help before syncing.");
+      }
+      if (remote.format !== "little-shop-sync") throw Error("The GitHub file isn’t a Little Shop sync file.");
+    }
+    // 2. Photos: match the shared copy's photo references with photos already on this iPad, download the rest
+    let local = await GO(),
+      byHash = new Map();
+    for (let p of local.products || []) p.image && p.image.startsWith("data:") && byHash.set(await lsSha1(p.image), p.image);
+    let known = new Set(remote ? remote.images || [] : []);
+    if (remote)
+      for (let p of remote.products || [])
+        if (p.image && p.image.startsWith("gh:")) {
+          let h = p.image.slice(3);
+          if (!byHash.has(h)) {
+            let f = await gh.getFile(LS_SYNC_IMG_DIR + h + ".txt");
+            f && f.text.startsWith("data:image/") && byHash.set(h, f.text);
+          }
+          p.image = byHash.get(h) || "";
+        }
+    // 3. Merge. A new iPad (no items yet) takes the shared password; an iPad with items keeps its own on first sync.
+    let first = !cfg.lastSync,
+      L = { ...local, sync: { ...(local.sync || {}) } };
+    if (first && remote && remote.salesPw && !(local.products || []).length)
+      ((L.salesPw = remote.salesPw), (L.sync.pwU = (remote.sync && remote.sync.pwU) || ""));
+    else if (first && (local.products || []).length && L.salesPw) L.sync.pwU = new Date().toISOString();
+    let merged = lsMerge(L, remote || {});
+    // 4. Upload photos that aren't on GitHub yet, then the shared copy (only if something changed)
+    let up = { format: "little-shop-sync", version: 1, images: [] };
+    for (let c of LS_COLL) up[c] = merged[c];
+    let used = new Set();
+    up.products = await Promise.all(
+      merged.products.map(async (p) => {
+        if (!p.image || !p.image.startsWith("data:")) return p;
+        let h = await lsSha1(p.image);
+        if (!known.has(h)) {
+          let res = await gh.putFile(LS_SYNC_IMG_DIR + h + ".txt", p.image, null, "Photo for " + p.name);
+          known.add(h);
+          void res;
+        }
+        used.add(h);
+        return { ...p, image: "gh:" + h };
+      }),
+    );
+    up.images = [...used].sort();
+    up.salesPw = merged.salesPw || null;
+    up.sync = merged.sync;
+    let text = JSON.stringify(up);
+    if (!file || text !== file.text) {
+      let res = await gh.putFile(LS_SYNC_FILE, text, file && file.sha, "Sync from " + device);
+      if (res.conflict) continue; // the other iPad saved at the same moment: start again
+    }
+    // 5. Apply locally (merging again in case something changed on this iPad meanwhile)
+    let forcePw = first && remote && remote.salesPw && !(local.products || []).length;
+    return await G5((t) => {
+      t.sync ||= {};
+      forcePw && ((t.salesPw = merged.salesPw), (t.sync.pwU = merged.sync.pwU));
+      let m = lsMerge(t, merged);
+      for (let c of LS_COLL) t[c] = m[c];
+      m.salesPw ? (t.salesPw = m.salesPw) : delete t.salesPw;
+      t.sync = m.sync;
+      return t;
+    });
+  }
+  throw Error("The other iPad was syncing at the same time. It will try again shortly.");
+}
+// =======================================================================================
+
 function m_({ offline: e = !1 } = {}) {
   let [t, a] = (0, wa.useState)(R1e),
     [r, n] = (0, wa.useState)(!1),
@@ -9162,6 +9412,11 @@ function m_({ offline: e = !1 } = {}) {
     [recentView, setRecentView] = (0, wa.useState)(""),
     [recentDel, setRecentDel] = (0, wa.useState)(""),
     [recentErr, setRecentErr] = (0, wa.useState)(""),
+    // Sync between iPads (GitHub)
+    [syncCfg, setSyncCfg] = (0, wa.useState)(() => lsSyncCfg()),
+    [syncStat, setSyncStat] = (0, wa.useState)({ state: "idle" }),
+    [syncFormErr, setSyncFormErr] = (0, wa.useState)(""),
+    syncBusy = (0, wa.useRef)(!1),
     // Inventory (morning stocktake)
     [invQ, setInvQ] = (0, wa.useState)(""),
     [stDraft, setStDraft] = (0, wa.useState)({}),
@@ -9372,6 +9627,49 @@ function m_({ offline: e = !1 } = {}) {
     } finally {
       ((ut.current = !1), s(!1));
     }
+  }
+  // ----- Sync between iPads -----
+  async function doSync() {
+    let cfg = lsSyncCfg();
+    if (!cfg || !cfg.token || syncBusy.current) return;
+    ((syncBusy.current = !0), setSyncStat((x) => ({ ...x, state: "syncing" })));
+    try {
+      let st = await lsSyncRun(cfg);
+      (a(st), (cfg.lastSync = new Date().toISOString()), lsSyncSave(cfg), setSyncCfg({ ...cfg }), setSyncStat({ state: "ok", at: cfg.lastSync }));
+    } catch (err) {
+      setSyncStat({ state: err.message === "offline" ? "offline" : "error", msg: err.message, at: cfg.lastSync });
+    } finally {
+      syncBusy.current = !1;
+    }
+  }
+  let syncRef = (0, wa.useRef)(doSync);
+  syncRef.current = doSync;
+  // Automatic: when the app opens, comes back online or to the front, every 3 minutes, and shortly after a change
+  (0, wa.useEffect)(() => {
+    if (!r) return;
+    let go = () => document.visibilityState !== "hidden" && syncRef.current(),
+      iv = setInterval(go, 18e4);
+    (go(), window.addEventListener("online", go), document.addEventListener("visibilitychange", go));
+    return () => (clearInterval(iv), window.removeEventListener("online", go), document.removeEventListener("visibilitychange", go));
+  }, [r]);
+  (0, wa.useEffect)(() => {
+    if (!r || !lsSyncCfg()) return;
+    let tm = setTimeout(() => syncRef.current(), 8e3);
+    return () => clearTimeout(tm);
+  }, [t.revision]);
+  async function saveSyncSettings(G) {
+    G.preventDefault();
+    setSyncFormErr("");
+    let f = new FormData(G.currentTarget),
+      repo = String(f.get("repo") || "").trim(),
+      token = String(f.get("token") || "").trim() || (syncCfg && syncCfg.token) || "",
+      device = String(f.get("device") || "").trim();
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo.replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "")))
+      return setSyncFormErr("Enter the repository as owner/name, e.g. KaiFrancis16/little-shop-data.");
+    if (!token) return setSyncFormErr("Paste the GitHub access key.");
+    let same = syncCfg && syncCfg.repo === repo && syncCfg.token === token,
+      cfg = { ...(syncCfg || {}), repo, token, device, ...(same ? {} : { lastSync: null }) };
+    (lsSyncSave(cfg), setSyncCfg(cfg), await doSync());
   }
   // ----- Last 3 sales (Checkout) -----
   let recent3 = [...t.sales].sort((x, y) => (x.at < y.at ? 1 : -1)).slice(0, 3);
@@ -10851,6 +11149,7 @@ function m_({ offline: e = !1 } = {}) {
                     ["items", "Items", Du],
                     ["headings", "Headings", Ou],
                     ["markets", "Markets", LsMapPin],
+                    ["sync", "Sync", qp],
                   ].map(([key, label, Icon]) =>
                     (0, T.jsxs)(
                       "button",
@@ -11118,6 +11417,123 @@ function m_({ offline: e = !1 } = {}) {
                               }),
                             ],
                           }),
+                    ],
+                  }),
+                // ---------- Sync ----------
+                es === "sync" &&
+                  (0, T.jsxs)("div", {
+                    className: "editing-section sync-section",
+                    children: [
+                      (0, T.jsx)("div", { className: "editing-section-heading", children: (0, T.jsx)("h2", { children: "Sync between iPads" }) }),
+                      (0, T.jsx)("p", {
+                        className: "muted editing-help",
+                        children:
+                          "When this iPad has internet (e.g. on the house Wi-Fi) it shares its changes with the other iPad through your private GitHub repository, and picks up theirs. At markets without internet it keeps working and catches up later. If the same thing was changed on both iPads, the most recent change wins; sales from both iPads are always kept.",
+                      }),
+                      (0, T.jsxs)("div", {
+                        className: "sync-status sync-" + (syncCfg && syncCfg.token ? syncStat.state : "off"),
+                        role: "status",
+                        children: [
+                          (0, T.jsx)(qp, { size: 20, className: syncStat.state === "syncing" ? "spin" : "" }),
+                          (0, T.jsx)("span", {
+                            children: !(syncCfg && syncCfg.token)
+                              ? "Sync is not set up on this iPad."
+                              : syncStat.state === "syncing"
+                                ? "Syncing…"
+                                : syncStat.state === "error"
+                                  ? syncStat.msg
+                                  : syncStat.state === "offline"
+                                    ? "No internet right now — will sync automatically when back on Wi-Fi." +
+                                      (syncCfg.lastSync ? " Last synced " + lsDayLabel(lsDay(syncCfg.lastSync)) + " " + lsTime(syncCfg.lastSync) + "." : "")
+                                    : syncCfg.lastSync
+                                      ? "Last synced " + lsDayLabel(lsDay(syncCfg.lastSync)) + " at " + lsTime(syncCfg.lastSync) + "."
+                                      : "Set up — not synced yet.",
+                          }),
+                        ],
+                      }),
+                      (0, T.jsxs)(
+                        "form",
+                        {
+                          className: "sync-form",
+                          onSubmit: saveSyncSettings,
+                          children: [
+                            (0, T.jsxs)("label", {
+                              className: "field",
+                              children: [
+                                "GitHub repository (owner/name)",
+                                (0, T.jsx)("input", {
+                                  name: "repo",
+                                  autoComplete: "off",
+                                  autoCapitalize: "none",
+                                  spellCheck: !1,
+                                  defaultValue: (syncCfg && syncCfg.repo) || "KaiFrancis16/little-shop-data",
+                                }),
+                              ],
+                            }),
+                            (0, T.jsxs)("label", {
+                              className: "field",
+                              children: [
+                                "GitHub access key",
+                                (0, T.jsx)("input", {
+                                  name: "token",
+                                  type: "password",
+                                  autoComplete: "off",
+                                  autoCapitalize: "none",
+                                  spellCheck: !1,
+                                  placeholder: syncCfg && syncCfg.token ? "Saved — leave blank to keep it" : "Paste the key (starts with github_pat_)",
+                                }),
+                              ],
+                            }),
+                            (0, T.jsxs)("label", {
+                              className: "field",
+                              children: [
+                                "This iPad’s name",
+                                (0, T.jsx)("input", {
+                                  name: "device",
+                                  maxLength: 40,
+                                  autoComplete: "off",
+                                  defaultValue: (syncCfg && syncCfg.device) || "",
+                                  placeholder: "e.g. Mum’s iPad",
+                                }),
+                              ],
+                            }),
+                            syncFormErr && (0, T.jsx)("p", { role: "alert", className: "form-error", children: syncFormErr }),
+                            (0, T.jsxs)("div", {
+                              className: "row-actions sync-actions",
+                              children: [
+                                (0, T.jsx)("button", {
+                                  className: "primary",
+                                  disabled: syncStat.state === "syncing",
+                                  children: syncCfg && syncCfg.token ? "Save and sync now" : "Set up and sync now",
+                                }),
+                                syncCfg &&
+                                  syncCfg.token &&
+                                  (0, T.jsxs)("button", {
+                                    type: "button",
+                                    className: "secondary",
+                                    disabled: syncStat.state === "syncing",
+                                    onClick: () => doSync(),
+                                    children: [(0, T.jsx)(qp, {}), "Sync now"],
+                                  }),
+                                syncCfg &&
+                                  syncCfg.token &&
+                                  (0, T.jsx)("button", {
+                                    type: "button",
+                                    className: "danger-outline",
+                                    onClick: () => (lsSyncSave(null), setSyncCfg(null), setSyncStat({ state: "idle" })),
+                                    children: "Turn off sync on this iPad",
+                                  }),
+                              ],
+                            }),
+                          ],
+                        },
+                        "sync-form-" + ((syncCfg && syncCfg.repo) || ""),
+                      ),
+                      (0, T.jsx)("p", {
+                        className: "muted sync-note",
+                        children:
+                          "The access key is stored only on this iPad and is never shared with the other iPad. Turning sync off doesn’t delete anything.",
+                      }),
                     ],
                   }),
                 // ---------- Markets ----------
