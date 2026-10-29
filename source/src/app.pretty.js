@@ -177,6 +177,8 @@ function oJ(e, t) {
     // Sale: cash (automatic 5% off, rounded to 5c) or card (optional staff 20% / stallholder 10%)
     let mk = typeof t.market == "string" ? t.market.trim() : "",
       dtype = t.method === "card" && (t.discount === "staff20" || t.discount === "stall10") ? t.discount : null,
+      isCustom = t.discount === "custom",
+      cust = isCustom && t.custom && typeof t.custom == "object" ? t.custom : {},
       nm = typeof t.staffName == "string" ? t.staffName.trim() : "";
     if (
       !["cash", "card"].includes(t.method) ||
@@ -186,7 +188,7 @@ function oJ(e, t) {
       !Array.isArray(t.lines) ||
       !t.lines.length ||
       t.lines.length > 200 ||
-      (t.discount != null && t.method === "card" && !dtype) ||
+      (t.discount != null && t.method === "card" && !dtype && !isCustom) ||
       (dtype && (!nm || nm.length > 60))
     )
       throw Error("Check the payment details and staff name.");
@@ -199,6 +201,9 @@ function oJ(e, t) {
           throw Error("Some items are unavailable. Refresh the basket.");
         if (s.qty > (left[l.id] || 0))
           throw Error(`Not enough ${l.name} left in today's stocktake (${Math.max(0, left[l.id] || 0)} left).`);
+        // Custom discount: amount off each one of this item (cents), no more than its price
+        let off = cust[l.id] ?? 0;
+        if (!Number.isSafeInteger(off) || off < 0 || off > l.price) throw Error(`The discount on ${l.name} must be between $0 and its price.`);
         return (
           n.add(s.id),
           {
@@ -208,14 +213,17 @@ function oJ(e, t) {
             price: l.price,
             qty: s.qty,
             total: l.price * s.qty,
+            ...(off > 0 ? { discount_each: off, discount_total: off * s.qty } : {}),
             category_id: l.category_id,
             ...Ow(l.category_id, e.categories),
           }
         );
       }),
-      o = i.reduce((s, l) => s + l.total, 0);
+      o = i.reduce((s, l) => s + l.total, 0),
+      co = i.reduce((s, l) => s + (l.discount_total || 0), 0);
     if (!Number.isSafeInteger(o) || o > 1e8) throw Error("The basket total is too large.");
-    let pr = lsPrice(o, t.method, dtype);
+    if (isCustom && co <= 0) throw Error("Enter an amount off for at least one item.");
+    let pr = lsPrice(o, t.method, dtype, co);
     r = {
       id: t.id,
       at: a,
@@ -225,7 +233,10 @@ function oJ(e, t) {
       subtotal: o,
       discount_type: pr.type,
       discount_pct: pr.pct,
+      // discount_amount = everything taken off (custom + percentage); custom_amount = per-item custom part
       discount_amount: pr.discount,
+      pct_amount: pr.pctOff,
+      custom_amount: pr.custom,
       staff_name: dtype ? nm : "",
       rounding: pr.rounding,
       total: pr.total,
@@ -8783,15 +8794,25 @@ var LS_DISCOUNTS = {
   stall10: { pct: 10, label: "Stallholder 10%" },
 };
 var lsMethod = (m) => (m === "cash" ? "Cash" : m === "card" ? "Card" : "Not recorded");
-var lsDiscountLabel = (s) => (s.discount_type && LS_DISCOUNTS[s.discount_type] ? LS_DISCOUNTS[s.discount_type].label : "None");
-// Price a basket. Cash: 5% off, then round to nearest 5c. Card: optional staff 20% / stallholder 10%.
-function lsPrice(subtotal, method, dtype) {
+// Custom (per-item dollar) discount taken off a sale
+var lsCustomOff = (s) => s.custom_amount || 0;
+var lsDiscountLabel = (s) => {
+  let base = s.discount_type && LS_DISCOUNTS[s.discount_type] ? LS_DISCOUNTS[s.discount_type].label : "",
+    cu = lsCustomOff(s) > 0 ? "Custom" : "";
+  return base && cu ? base + " + custom" : base || (cu ? "Custom discount" : "None");
+};
+var lsIsDiscounted = (s) => !!s.discount_type || lsCustomOff(s) > 0;
+// Price a basket.
+// custom = total dollars-off from per-item custom discounts (cents). It comes off first.
+// Cash: then 5% off, then round to nearest 5c. Card: then optional staff 20% / stallholder 10% (not with custom).
+function lsPrice(subtotal, method, dtype, custom = 0) {
   let type = method === "cash" ? "cash5" : method === "card" && (dtype === "staff20" || dtype === "stall10") ? dtype : null,
     pct = type ? LS_DISCOUNTS[type].pct : 0,
-    discount = Math.round((subtotal * pct) / 100),
-    after = subtotal - discount,
+    base = Math.max(0, subtotal - custom),
+    pctOff = Math.round((base * pct) / 100),
+    after = base - pctOff,
     total = method === "cash" ? lsRound5(after) : after;
-  return { type, pct, discount, rounding: total - after, total };
+  return { type, pct, pctOff, custom, discount: custom + pctOff, rounding: total - after, total };
 }
 var lsSaleDay = (s) => s.date || lsDay(s.at);
 var lsStocktake = (state, day, market) =>
@@ -8887,6 +8908,27 @@ function lsFinish(d) {
   }
   return d;
 }
+// Percentage part of a sale's discount (older sales stored it all in discount_amount)
+var lsPctOff = (s) => (s.pct_amount ?? (s.discount_type ? s.discount_amount || 0 : 0));
+// Summary rows by discount type: Cash 5% / Staff 20% / Stallholder 10% / Custom
+function lsDiscountRows(sales, withTotals) {
+  let rows = Object.keys(LS_DISCOUNTS)
+    .map((k) => {
+      let l = sales.filter((s) => s.discount_type === k && lsPctOff(s) > 0);
+      if (!l.length) return null;
+      let t = (f) => lsMoney(l.reduce((a, s) => a + f(s), 0));
+      return withTotals
+        ? [LS_DISCOUNTS[k].label, String(l.length), t((s) => s.subtotal), t(lsPctOff)]
+        : [LS_DISCOUNTS[k].label, String(l.length), t(lsPctOff)];
+    })
+    .filter(Boolean),
+    cu = sales.filter((s) => lsCustomOff(s) > 0);
+  if (cu.length) {
+    let t = (f) => lsMoney(cu.reduce((a, s) => a + f(s), 0));
+    rows.push(withTotals ? ["Custom discount (per item)", String(cu.length), t((s) => s.subtotal), t(lsCustomOff)] : ["Custom discount (per item)", String(cu.length), t(lsCustomOff)]);
+  }
+  return rows;
+}
 function lsOverallPdf(state, day, market) {
   let sales = state.sales.filter((s) => lsSaleDay(s) === day && s.market === market).sort((a, b) => a.at.localeCompare(b.at)),
     sum = (f, list) => (list || sales).reduce((t, s) => t + f(s), 0),
@@ -8925,12 +8967,7 @@ function lsOverallPdf(state, day, market) {
     d,
     "Discounts",
     ["Discount", "Sales", "Amount given"],
-    Object.keys(LS_DISCOUNTS)
-      .map((k) => {
-        let l = sales.filter((s) => s.discount_type === k);
-        return l.length ? [LS_DISCOUNTS[k].label, String(l.length), lsMoney(sum((s) => s.discount_amount || 0, l))] : null;
-      })
-      .filter(Boolean),
+    lsDiscountRows(sales, !1),
   );
   let byItem = new Map();
   for (let s of sales)
@@ -8967,22 +9004,41 @@ function lsOverallPdf(state, day, market) {
 }
 function lsDiscountPdf(state, day, market) {
   let sales = state.sales
-      .filter((s) => lsSaleDay(s) === day && s.market === market && s.discount_type)
+      .filter((s) => lsSaleDay(s) === day && s.market === market && lsIsDiscounted(s))
       .sort((a, b) => a.at.localeCompare(b.at)),
     d = lsDoc("Discounted sales", day, market, !0);
-  lsTable(
-    d,
-    "Summary",
-    ["Discount", "Sales", "Before discount", "Discount given", "Paid"],
-    Object.keys(LS_DISCOUNTS)
-      .map((k) => {
-        let l = sales.filter((s) => s.discount_type === k);
-        if (!l.length) return null;
-        let t = (f) => lsMoney(l.reduce((a, s) => a + f(s), 0));
-        return [LS_DISCOUNTS[k].label, String(l.length), t((s) => s.subtotal), t((s) => s.discount_amount || 0), t((s) => s.total)];
-      })
-      .filter(Boolean),
-  );
+  lsTable(d, "Summary", ["Discount", "Sales", "Sales value before discount", "Discount given"], lsDiscountRows(sales, !0));
+  // How much was taken off each product (custom discounts)
+  let perItem = sales.flatMap((s) => s.lines.filter((l) => (l.discount_each || 0) > 0).map((l) => ({ s, l })));
+  perItem.length &&
+    lsTable(
+      d,
+      "Custom discounts by product",
+      ["Time", "Product", "Qty", "Price each", "Off each", "Total off", "Payment"],
+      perItem.map(({ s, l }) => [
+        lsTime(s.at),
+        l.name,
+        String(l.qty),
+        lsMoney(l.price),
+        "-" + lsMoney(l.discount_each),
+        "-" + lsMoney(l.discount_total ?? l.discount_each * l.qty),
+        lsMethod(s.method),
+      ]),
+    );
+  if (perItem.length) {
+    let tot = new Map();
+    for (let { l } of perItem) {
+      tot.has(l.name) || tot.set(l.name, { qty: 0, off: 0 });
+      let r = tot.get(l.name);
+      ((r.qty += l.qty), (r.off += l.discount_total ?? l.discount_each * l.qty));
+    }
+    lsTable(
+      d,
+      "Custom discount totals per product",
+      ["Product", "Qty discounted", "Total taken off"],
+      [...tot.entries()].sort((a, b) => b[1].off - a[1].off).map(([n, r]) => [n, String(r.qty), "-" + lsMoney(r.off)]),
+    );
+  }
   lsTable(
     d,
     "All discounted sales",
@@ -8992,7 +9048,9 @@ function lsDiscountPdf(state, day, market) {
       lsDiscountLabel(s),
       lsMethod(s.method),
       s.staff_name || "-",
-      s.lines.map((l) => l.qty + " x " + l.name).join(", "),
+      s.lines
+        .map((l) => l.qty + " x " + l.name + ((l.discount_each || 0) > 0 ? " (-" + lsMoney(l.discount_each) + " each)" : ""))
+        .join(", "),
       lsMoney(s.subtotal),
       "-" + lsMoney(s.discount_amount || 0),
       lsMoney(s.total),
@@ -9091,6 +9149,8 @@ function m_({ offline: e = !1 } = {}) {
     // Process sale: card discount option and the staff name logged with it
     [dsc, setDsc] = (0, wa.useState)("none"),
     [dName, setDName] = (0, wa.useState)(""),
+    // Custom discount: dollars off each item, typed per basket line { productId: "1.50" }
+    [cust, setCust] = (0, wa.useState)({}),
     // Inventory (morning stocktake)
     [invQ, setInvQ] = (0, wa.useState)(""),
     [stDraft, setStDraft] = (0, wa.useState)({}),
@@ -9216,7 +9276,19 @@ function m_({ offline: e = !1 } = {}) {
     stToday = ve ? lsStocktake(t, today, ve) : null,
     rem = ve ? lsRemaining(t, today, ve) : {},
     left = (id) => Math.max(0, rem[id] || 0),
-    pr = lsPrice(Jt, vt, dsc),
+    // Custom discount per item (capped at the item's price)
+    custEach = (G) => {
+      let v = Rf(String(cust[G.id] ?? "").trim() || "0");
+      return Number.isFinite(v) ? Math.min(v, G.price) : 0;
+    },
+    custBad =
+      dsc === "custom" &&
+      dt.some((G) => {
+        let raw = String(cust[G.id] ?? "").trim();
+        return raw !== "" && (!Number.isFinite(Rf(raw)) || Rf(raw) > G.price);
+      }),
+    custTotal = dsc === "custom" ? dt.reduce((a2, G) => a2 + custEach(G) * G.qty, 0) : 0,
+    pr = lsPrice(Jt, vt, dsc, custTotal),
     ft = pr.total,
     kt = dt.reduce((G, Te) => G + Te.qty, 0),
     da = dt.some((G) => G.archived || G.qty > left(G.id)),
@@ -9622,8 +9694,10 @@ function m_({ offline: e = !1 } = {}) {
           id: Gt.current,
           cash: 0,
           method: vt,
-          discount: vt === "card" && dsc !== "none" ? dsc : null,
-          staffName: vt === "card" && dsc !== "none" ? dName.trim() : "",
+          discount: dsc === "custom" ? "custom" : vt === "card" && dsc !== "none" ? dsc : null,
+          staffName: vt === "card" && (dsc === "staff20" || dsc === "stall10") ? dName.trim() : "",
+          custom:
+            dsc === "custom" ? Object.fromEntries(dt.map((G) => [G.id, custEach(G)]).filter(([, v]) => v > 0)) : void 0,
           market: ve,
           lines: dt.map((Te) => ({ id: Te.id, qty: Te.qty })),
         });
@@ -10138,7 +10212,7 @@ function m_({ offline: e = !1 } = {}) {
                           className: "primary checkout",
                           disabled: !dt.length || da || !!i || !ve,
                           onClick: () => {
-                            (Gt.current || (Gt.current = crypto.randomUUID()), F(""), lt(""), setDsc("none"), setDName(""), ee(""), S(!0));
+                            (Gt.current || (Gt.current = crypto.randomUUID()), F(""), lt(""), setDsc("none"), setDName(""), setCust({}), ee(""), S(!0));
                           },
                           children: "Process sale",
                         }),
@@ -11184,7 +11258,7 @@ function m_({ offline: e = !1 } = {}) {
                                                     (0, T.jsx)(ss, { children: x2.lines.reduce((b2, l2) => b2 + l2.qty, 0) }),
                                                     (0, T.jsx)(ss, { children: lsMethod(x2.method) }),
                                                     (0, T.jsx)(ss, {
-                                                      children: x2.discount_type
+                                                      children: lsIsDiscounted(x2)
                                                         ? lsDiscountLabel(x2) + (x2.staff_name ? " \xB7 " + x2.staff_name : "")
                                                         : "—",
                                                     }),
@@ -11782,7 +11856,7 @@ function m_({ offline: e = !1 } = {}) {
               // Only a tap chooses the payment type (focus alone must not pick Cash)
               activationMode: "manual",
               onValueChange: (G) => {
-                A || (lt(G), ee(""), G === "cash" && (setDsc("none"), setDName("")));
+                A || (lt(G), ee(""), G === "cash" && dsc !== "custom" && (setDsc("none"), setDName("")));
               },
               children: (0, T.jsxs)(rE, {
                 className: "payment-methods",
@@ -11793,32 +11867,34 @@ function m_({ offline: e = !1 } = {}) {
               }),
             }),
             vt === "" && (0, T.jsx)("p", { className: "muted", children: "Choose cash or card to continue." }),
-            // Step 2 (card only): sale options
-            vt === "card" &&
+            // Step 2: sale options (cash: 5% automatic, or custom + 5%; card: none / staff / stallholder / custom)
+            vt !== "" &&
               (0, T.jsxs)(T.Fragment, {
                 children: [
                   (0, T.jsx)("p", { className: "sale-step", children: "2. Sale option" }),
                   (0, T.jsx)("div", {
                     className: "category-chips sale-options",
-                    children: [
-                      ["none", "No discount"],
-                      ["staff20", "Staff 20%"],
-                      ["stall10", "Stallholder 10%"],
-                    ].map(([k, lbl]) =>
+                    children: (vt === "cash"
+                      ? [
+                          ["none", "Cash 5% (automatic)"],
+                          ["custom", "Custom discount"],
+                        ]
+                      : [
+                          ["none", "No discount"],
+                          ["staff20", "Staff 20%"],
+                          ["stall10", "Stallholder 10%"],
+                          ["custom", "Custom discount"],
+                        ]
+                    ).map(([k, lbl]) =>
                       (0, T.jsx)(
                         "button",
-                        {
-                          type: "button",
-                          "aria-pressed": dsc === k,
-                          disabled: A,
-                          onClick: () => (setDsc(k), ee("")),
-                          children: lbl,
-                        },
+                        { type: "button", "aria-pressed": dsc === k, disabled: A, onClick: () => (setDsc(k), ee("")), children: lbl },
                         k,
                       ),
                     ),
                   }),
-                  dsc !== "none" &&
+                  vt === "card" &&
+                    (dsc === "staff20" || dsc === "stall10") &&
                     (0, T.jsxs)("label", {
                       className: "field",
                       children: [
@@ -11832,6 +11908,69 @@ function m_({ offline: e = !1 } = {}) {
                         }),
                       ],
                     }),
+                  // Custom discount: choose the items and the dollars off each
+                  dsc === "custom" &&
+                    (0, T.jsxs)("div", {
+                      className: "custom-discount",
+                      children: [
+                        (0, T.jsx)("p", {
+                          className: "muted custom-help",
+                          children:
+                            vt === "cash"
+                              ? "Type the amount off each item that gets a discount. The 5% cash discount is then taken off the new total."
+                              : "Type the amount off each item that gets a discount. Leave the others blank.",
+                        }),
+                        dt.map((G) => {
+                          let raw = String(cust[G.id] ?? ""),
+                            each = custEach(G),
+                            bad = raw.trim() !== "" && (!Number.isFinite(Rf(raw.trim())) || Rf(raw.trim()) > G.price);
+                          return (0, T.jsxs)(
+                            "div",
+                            {
+                              className: "custom-row" + (each > 0 ? " has-discount" : ""),
+                              children: [
+                                (0, T.jsxs)("div", {
+                                  className: "custom-item",
+                                  children: [
+                                    (0, T.jsx)("strong", { children: G.name }),
+                                    (0, T.jsxs)("small", { children: [G.qty, " × ", ln(G.price)] }),
+                                  ],
+                                }),
+                                (0, T.jsxs)("label", {
+                                  className: "custom-input",
+                                  children: [
+                                    (0, T.jsx)("span", { children: "$ off each" }),
+                                    (0, T.jsx)("input", {
+                                      type: "number",
+                                      inputMode: "decimal",
+                                      min: "0",
+                                      max: (G.price / 100).toFixed(2),
+                                      step: "0.05",
+                                      placeholder: "0.00",
+                                      "aria-label": "Amount off each " + G.name,
+                                      value: raw,
+                                      onChange: (ev) => {
+                                        let v = ev.target.value;
+                                        (setCust((c) => ({ ...c, [G.id]: v })), ee(""));
+                                      },
+                                    }),
+                                  ],
+                                }),
+                                (0, T.jsx)("span", {
+                                  className: "custom-line" + (bad ? " bad" : ""),
+                                  children: bad
+                                    ? "Max " + ln(G.price)
+                                    : each > 0
+                                      ? "−" + ln(each * G.qty) + (G.qty > 1 ? " total" : "")
+                                      : "",
+                                }),
+                              ],
+                            },
+                            G.id,
+                          );
+                        }),
+                      ],
+                    }),
                 ],
               }),
             // Price breakdown
@@ -11840,12 +11979,17 @@ function m_({ offline: e = !1 } = {}) {
                 className: "price-breakdown",
                 children: [
                   (0, T.jsxs)("div", { children: [(0, T.jsx)("span", { children: "Items" }), (0, T.jsx)("span", { children: ln(Jt) })] }),
-                  pr.discount > 0 &&
+                  pr.custom > 0 &&
+                    (0, T.jsxs)("div", {
+                      className: "discount-row",
+                      children: [(0, T.jsx)("span", { children: "Custom discount" }), (0, T.jsx)("span", { children: "\u2212" + ln(pr.custom) })],
+                    }),
+                  pr.pctOff > 0 &&
                     (0, T.jsxs)("div", {
                       className: "discount-row",
                       children: [
                         (0, T.jsx)("span", { children: LS_DISCOUNTS[pr.type].label + (vt === "cash" ? " (automatic)" : "") }),
-                        (0, T.jsx)("span", { children: "−" + ln(pr.discount) }),
+                        (0, T.jsx)("span", { children: "\u2212" + ln(pr.pctOff) }),
                       ],
                     }),
                   pr.rounding !== 0 &&
@@ -11929,15 +12073,23 @@ function m_({ offline: e = !1 } = {}) {
             vt !== "" &&
               (0, T.jsx)("button", {
                 className: "primary checkout",
-                disabled: A || da || (vt === "card" && dsc !== "none" && !dName.trim()),
+                disabled:
+                  A ||
+                  da ||
+                  (vt === "card" && (dsc === "staff20" || dsc === "stall10") && !dName.trim()) ||
+                  (dsc === "custom" && (custBad || custTotal <= 0)),
                 onClick: Ln,
                 children: A
-                  ? "Saving…"
-                  : vt === "card"
-                    ? dsc !== "none" && !dName.trim()
-                      ? "Enter the staff name to continue"
-                      : "Card payment received — complete sale"
-                    : "Complete cash sale",
+                  ? "Saving\u2026"
+                  : dsc === "custom" && custBad
+                    ? "A discount is more than the item\u2019s price"
+                    : dsc === "custom" && custTotal <= 0
+                      ? "Enter an amount off for at least one item"
+                      : vt === "card"
+                        ? (dsc === "staff20" || dsc === "stall10") && !dName.trim()
+                          ? "Enter the staff name to continue"
+                          : "Card payment received \u2014 complete sale"
+                        : "Complete cash sale",
               }),
           ],
         }),
@@ -12005,19 +12157,33 @@ function m_({ offline: e = !1 } = {}) {
                                 (0, T.jsx)("span", { children: ln(G.total) }),
                               ],
                             }),
-                            (0, T.jsx)("small", { className: "muted", children: ln(G.price) }),
+                            (0, T.jsx)("small", {
+                              className: "muted",
+                              children:
+                                ln(G.price) +
+                                ((G.discount_each || 0) > 0
+                                  ? "  \u00b7  custom \u2212" + ln(G.discount_each) + " each (\u2212" + ln(G.discount_total ?? G.discount_each * G.qty) + ")"
+                                  : ""),
+                            }),
                           ],
                         },
                         G.id,
                       ),
                     ),
                   }),
-                  !!z.discount_amount &&
+                  lsCustomOff(z) > 0 &&
+                    (0, T.jsxs)("div", {
+                      className: "line-title",
+                      children: [(0, T.jsx)("span", { children: "Custom discount" }), (0, T.jsx)("span", { children: "\u2212" + ln(lsCustomOff(z)) })],
+                    }),
+                  lsPctOff(z) > 0 &&
                     (0, T.jsxs)("div", {
                       className: "line-title",
                       children: [
-                        (0, T.jsx)("span", { children: lsDiscountLabel(z) + (z.staff_name ? " \xB7 " + z.staff_name : "") }),
-                        (0, T.jsx)("span", { children: "\u2212" + ln(z.discount_amount) }),
+                        (0, T.jsx)("span", {
+                          children: (LS_DISCOUNTS[z.discount_type]?.label || "Discount") + (z.staff_name ? " \xB7 " + z.staff_name : ""),
+                        }),
+                        (0, T.jsx)("span", { children: "\u2212" + ln(lsPctOff(z)) }),
                       ],
                     }),
                   !!z.rounding &&
