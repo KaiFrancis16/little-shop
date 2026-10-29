@@ -9614,7 +9614,7 @@ var jO = (e) =>
     }),
   WO = (e) =>
     typeof e == "string" &&
-    (!e || /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(e)) &&
+    (!e || /^gh:[0-9a-f]{40}$/.test(e) || /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(e)) &&
     e.length < 7e6;
 async function j5(e) {
   if (e.size > 5e6 || !["image/jpeg", "image/png", "image/webp"].includes(e.type))
@@ -18428,6 +18428,7 @@ function lsDeliver(doc, filename) {
 // shared copy from GitHub, merges it with its own (most recent change wins; sales from both are kept;
 // deletions are remembered as "tombstones"), writes the result back, and applies it locally.
 // The access key is kept only on this iPad (localStorage), never in the synced data.
+var lsImg = (s) => !!s && !s.startsWith("gh:");
 var LS_SYNC_KEY = "little-shop-sync",
   LS_SYNC_FILE = "little-shop-data.json",
   LS_SYNC_IMG_DIR = "little-shop-photos/",
@@ -18564,10 +18565,19 @@ function lsGh(cfg) {
     async putFile(path, text, sha, message) {
       let r = await call("PUT", path, { message, content: lsB64enc(text), ...(sha ? { sha } : {}) });
       if (r.status === 409 || r.status === 422) return { conflict: !0, status: r.status };
+      if (r.status === 429 || (r.status === 403 && /rate limit/i.test(await r.clone().text().catch(() => ""))))
+        return { conflict: !0, status: 429 };
       if (r.status === 403 || r.status === 404)
         throw Error("The access key isn’t allowed to save to this repository. It needs Contents: Read and write.");
       if (!r.ok) throw Error("GitHub problem (" + r.status + ") saving. Try again later.");
       return { ok: !0 };
+    },
+    async listDir(path) {
+      let r = await call("GET", path);
+      if (r.status === 404) return [];
+      if (!r.ok) throw Error("GitHub problem (" + r.status + ") reading " + path + ".");
+      let j = await r.json();
+      return Array.isArray(j) ? j.map((x) => x.name) : [];
     },
     async repoOk() {
       let r;
@@ -18607,20 +18617,29 @@ async function lsSyncRun(cfg) {
     let local = await GO(),
       byHash = new Map();
     for (let p of local.products || []) p.image && p.image.startsWith("data:") && byHash.set(await lsSha1(p.image), p.image);
-    let known = new Set(remote ? remote.images || [] : []);
-    if (remote)
-      for (let p of remote.products || [])
-        if (p.image && p.image.startsWith("gh:")) {
-          let h = p.image.slice(3);
-          if (!byHash.has(h)) {
+    // Photos actually stored on GitHub (checked every time, so a photo that failed to upload is retried)
+    let known = new Set((await gh.listDir(LS_SYNC_IMG_DIR.replace(/\/$/, ""))).filter((n) => /^[0-9a-f]{40}\.txt$/.test(n)).map((n) => n.slice(0, 40))),
+      tried = new Set(),
+      fill = async (p) => {
+        if (!p.image || !p.image.startsWith("gh:")) return;
+        let h = p.image.slice(3);
+        if (!byHash.has(h) && !tried.has(h)) {
+          tried.add(h);
+          try {
             let f = await gh.getFile(LS_SYNC_IMG_DIR + h + ".txt");
             f && f.text.startsWith("data:image/") && byHash.set(h, f.text);
+          } catch (err) {
+            if (err.message === "offline") throw err;
           }
-          p.image = byHash.get(h) || "";
         }
+        // If the photo isn't available yet, keep the reference so it is never lost and is fetched next time
+        byHash.has(h) && (p.image = byHash.get(h));
+      };
+    if (remote) for (let p of remote.products || []) await fill(p);
     // 3. Merge. A new iPad (no items yet) takes the shared password; an iPad with items keeps its own on first sync.
     let first = !cfg.lastSync,
-      L = { ...local, sync: { ...(local.sync || {}) } };
+      L = { ...local, products: (local.products || []).map((p) => ({ ...p })), sync: { ...(local.sync || {}) } };
+    for (let p of L.products) await fill(p);
     if (first && remote && remote.salesPw && !(local.products || []).length)
       ((L.salesPw = remote.salesPw), (L.sync.pwU = (remote.sync && remote.sync.pwU) || ""));
     else if (first && (local.products || []).length && L.salesPw) L.sync.pwU = new Date().toISOString();
@@ -18629,19 +18648,28 @@ async function lsSyncRun(cfg) {
     let up = { format: "little-shop-sync", version: 1, images: [] };
     for (let c of LS_COLL) up[c] = merged[c];
     let used = new Set();
-    up.products = await Promise.all(
-      merged.products.map(async (p) => {
-        if (!p.image || !p.image.startsWith("data:")) return p;
-        let h = await lsSha1(p.image);
-        if (!known.has(h)) {
-          let res = await gh.putFile(LS_SYNC_IMG_DIR + h + ".txt", p.image, null, "Photo for " + p.name);
-          known.add(h);
-          void res;
-        }
-        used.add(h);
-        return { ...p, image: "gh:" + h };
-      }),
-    );
+    up.products = [];
+    // One photo at a time: GitHub rejects saves made at the same moment
+    for (let p of merged.products) {
+      if (p.image && p.image.startsWith("gh:")) {
+        used.add(p.image.slice(3));
+        up.products.push(p);
+        continue;
+      }
+      if (!p.image || !p.image.startsWith("data:")) {
+        up.products.push(p);
+        continue;
+      }
+      let h = await lsSha1(p.image);
+      for (let i = 0; i < 5 && !known.has(h); i++) {
+        i && (await new Promise((res) => setTimeout(res, 1000 * i)));
+        let res = await gh.putFile(LS_SYNC_IMG_DIR + h + ".txt", p.image, null, "Photo for " + p.name);
+        // 422 = a photo with this name is already there
+        (res.ok || res.status === 422) && known.add(h);
+      }
+      used.add(h);
+      up.products.push({ ...p, image: "gh:" + h });
+    }
     up.images = [...used].sort();
     up.salesPw = merged.salesPw || null;
     up.sync = merged.sync;
@@ -18655,6 +18683,7 @@ async function lsSyncRun(cfg) {
     return await G5((t) => {
       t.sync ||= {};
       forcePw && ((t.salesPw = merged.salesPw), (t.sync.pwU = merged.sync.pwU));
+      for (let p of t.products || []) p.image && p.image.startsWith("gh:") && byHash.has(p.image.slice(3)) && (p.image = byHash.get(p.image.slice(3)));
       let m = lsMerge(t, merged);
       for (let c of LS_COLL) t[c] = m[c];
       m.salesPw ? (t.salesPw = m.salesPw) : delete t.salesPw;
@@ -19467,7 +19496,7 @@ function m_({ offline: e = !1 } = {}) {
         children: [
           (0, T.jsx)("div", {
             className: "product-image",
-            children: G.image
+            children: lsImg(G.image)
               ? (0, T.jsx)("img", { src: G.image, alt: G.name })
               : (0, T.jsx)(Du, { size: 48, color: "#8aa392" }),
           }),
@@ -19498,7 +19527,7 @@ function m_({ offline: e = !1 } = {}) {
         qt(G.category_id).subcategory,
         G.price / 100,
         G.stock,
-        G.image ? new URL(G.image, location.origin).href : "",
+        lsImg(G.image) ? new URL(G.image, location.origin).href : "",
       ]),
     ]);
   }
@@ -20511,7 +20540,7 @@ function m_({ offline: e = !1 } = {}) {
                                             children: (0, T.jsxs)("div", {
                                               className: "item-name",
                                               children: [
-                                                G.image
+                                                lsImg(G.image)
                                                   ? (0, T.jsx)("img", { className: "thumb", src: G.image, alt: "" })
                                                   : (0, T.jsx)("span", {
                                                       className: "thumb",
@@ -21210,7 +21239,7 @@ function m_({ offline: e = !1 } = {}) {
                       (0, T.jsxs)("div", {
                         className: "photo-field",
                         children: [
-                          D || C.image
+                          D || lsImg(C.image)
                             ? (0, T.jsx)("img", {
                                 className: "photo-preview",
                                 src: D || C.image,
